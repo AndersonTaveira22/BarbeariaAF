@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { add, format, startOfDay, endOfDay, set } from 'date-fns'; // Import 'set'
+import { add, format, startOfDay, endOfDay, set } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Clock, User, Scissors, Lock, Unlock } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
@@ -36,7 +36,6 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     const start = startOfDay(selectedDate).toISOString();
     const end = endOfDay(selectedDate).toISOString();
 
-    // 1. Fetch availability, appointments, and blocked slots in parallel
     const [availabilityRes, appointmentsRes, blockedSlotsRes] = await Promise.all([
       supabase.from('barber_availability').select('start_time, end_time').eq('barber_id', currentUser.id).eq('date', dateStr).single(),
       supabase.from('appointments').select('id, appointment_time, profiles(full_name), services(name)').eq('barber_id', currentUser.id).gte('appointment_time', start).lte('appointment_time', end),
@@ -53,11 +52,10 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     const { data: appointments } = appointmentsRes;
     const { data: blockedSlots } = blockedSlotsRes;
 
-    // Helper to convert UTC DB timestamp to local Date object for comparison
     const toLocalTimeForComparison = (utcIsoString: string, targetDate: Date) => {
       const utcDate = new Date(utcIsoString);
       return set(startOfDay(targetDate), {
-        hours: utcDate.getHours(), // Get local hour component of the UTC date
+        hours: utcDate.getHours(),
         minutes: utcDate.getMinutes(),
         seconds: 0,
         milliseconds: 0
@@ -73,16 +71,15 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       time: toLocalTimeForComparison(b.start_time, selectedDate).getTime(),
       details: { id: b.id }
     })) || [];
-
-    // 2. Generate all possible slots
+    
     const allSlots: Slot[] = [];
     const slotDuration = 45;
     
     let currentTime = new Date(`${dateStr}T${availability.start_time}`);
-    currentTime = set(currentTime, { milliseconds: 0 }); // Normalize milliseconds
+    currentTime = set(currentTime, { milliseconds: 0 });
     
     const endTime = new Date(`${dateStr}T${availability.end_time}`);
-    const normalizedEndTime = set(endTime, { milliseconds: 0 }); // Normalize for comparison
+    const normalizedEndTime = set(endTime, { milliseconds: 0 });
 
     while (currentTime < normalizedEndTime) {
       const currentSlotTime = currentTime.getTime();
@@ -93,11 +90,10 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
         allSlots.push({ time: new Date(currentTime), status: 'booked', details: bookedSlot.details });
       } else if (blockedSlot) {
         allSlots.push({ time: new Date(currentTime), status: 'blocked', details: blockedSlot.details });
-      } else {
-        allSlots.push({ time: new Date(currentTime), status: 'available' });
       }
+      // Horários 'available' não são mais adicionados à lista
       currentTime = add(currentTime, { minutes: slotDuration });
-      currentTime = set(currentTime, { milliseconds: 0 }); // Normalize after adding minutes
+      currentTime = set(currentTime, { milliseconds: 0 });
     }
 
     setSlots(allSlots);
@@ -145,7 +141,8 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       case 'blocked':
         return <div className="flex-1 flex items-center gap-2 text-destructive"><Lock className="h-4 w-4" /><span>Horário Bloqueado</span></div>;
       default:
-        return <div className="flex-1 flex items-center text-green-400">Disponível</div>;
+        // Este caso não deve ser alcançado se os slots 'available' forem filtrados
+        return null;
     }
   };
 
@@ -165,13 +162,13 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
                   <p className="text-lg font-bold">{format(slot.time, 'HH:mm')}</p>
                 </div>
                 {renderSlot(slot)}
-                {slot.status === 'available' && <Button variant="outline" size="sm" onClick={() => handleBlock(slot.time)}><Lock className="mr-2 h-4 w-4" />Bloquear</Button>}
+                {/* O botão de bloquear só aparecerá se você quiser reintroduzir a opção de bloquear horários disponíveis */}
                 {slot.status === 'blocked' && <Button variant="secondary" size="sm" onClick={() => handleUnblock(slot.details!.id)}><Unlock className="mr-2 h-4 w-4" />Desbloquear</Button>}
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-center text-muted-foreground py-8">Nenhum horário disponível para esta data.</p>
+          <p className="text-center text-muted-foreground py-8">Nenhum agendamento ou horário bloqueado para esta data.</p>
         )}
       </CardContent>
     </Card>
