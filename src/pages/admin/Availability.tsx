@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { Trash2 } from 'lucide-react';
+import BackButton from '@/components/BackButton';
 
 const daysOfWeek = [
   { value: 1, label: 'Segunda-feira' },
@@ -75,57 +76,60 @@ const Availability = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-8">
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-3xl font-serif">Gerenciar Disponibilidade</CardTitle>
-          <CardDescription>Adicione ou atualize seus horários de trabalho semanais.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleAddAvailability} className="grid gap-4 mb-8 p-4 border rounded-lg">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="grid gap-2">
-                <Label>Dia da Semana</Label>
-                <Select value={day} onValueChange={setDay}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o dia" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {daysOfWeek.map(d => <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+      <div className="max-w-2xl mx-auto">
+        <BackButton />
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-3xl font-serif">Gerenciar Disponibilidade</CardTitle>
+            <CardDescription>Adicione ou atualize seus horários de trabalho semanais.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleAddAvailability} className="grid gap-4 mb-8 p-4 border rounded-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid gap-2">
+                  <Label>Dia da Semana</Label>
+                  <Select value={day} onValueChange={setDay}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o dia" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {daysOfWeek.map(d => <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="start-time">Início</Label>
+                  <Input id="start-time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="end-time">Fim</Label>
+                  <Input id="end-time" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="start-time">Início</Label>
-                <Input id="start-time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="end-time">Fim</Label>
-                <Input id="end-time" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
-              </div>
-            </div>
-            <Button type="submit" className="w-full sm:w-auto justify-self-end">Salvar Horário</Button>
-          </form>
+              <Button type="submit" className="w-full sm:w-auto justify-self-end">Salvar Horário</Button>
+            </form>
 
-          <div>
-            <h3 className="text-xl font-serif mb-4">Sua Agenda Semanal</h3>
-            <div className="space-y-2">
-              {availabilities.length > 0 ? (
-                availabilities.map(avail => (
-                  <div key={avail.id} className="flex justify-between items-center p-3 bg-card rounded-md">
-                    <span className="font-medium">{daysOfWeek.find(d => d.value === avail.day_of_week)?.label}</span>
-                    <span>{avail.start_time.slice(0, 5)} - {avail.end_time.slice(0, 5)}</span>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(avail.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                ))
-              ) : (
-                <p className="text-muted-foreground">Nenhum horário de trabalho cadastrado.</p>
-              )}
+            <div>
+              <h3 className="text-xl font-serif mb-4">Sua Agenda Semanal</h3>
+              <div className="space-y-2">
+                {availabilities.length > 0 ? (
+                  availabilities.map(avail => (
+                    <div key={avail.id} className="flex justify-between items-center p-3 bg-card rounded-md">
+                      <span className="font-medium">{daysOfWeek.find(d => d.value === avail.day_of_week)?.label}</span>
+                      <span>{avail.start_time.slice(0, 5)} - {avail.end_time.slice(0, 5)}</span>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(avail.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-muted-foreground">Nenhum horário de trabalho cadastrado.</p>
+                )}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

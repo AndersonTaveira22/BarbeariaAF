@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
+import BackButton from '@/components/BackButton';
 
 interface Service {
   id: string;
@@ -84,15 +85,18 @@ const NewAppointment = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-8">
-      <Card className="max-w-4xl mx-auto border-border">
-        <CardHeader>
-          <CardTitle className="text-4xl font-serif">Novo Agendamento</CardTitle>
-          <CardDescription>Siga os passos para agendar seu horário.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {renderStepContent()}
-        </CardContent>
-      </Card>
+      <div className="max-w-4xl mx-auto">
+        <BackButton />
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="text-4xl font-serif">Novo Agendamento</CardTitle>
+            <CardDescription>Siga os passos para agendar seu horário.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {renderStepContent()}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
