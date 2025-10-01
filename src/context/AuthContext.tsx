@@ -59,17 +59,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (phone, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ phone, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ phone, password });
     if (error) {
       showError(error.message);
-    } else {
-      showSuccess('Login realizado com sucesso!');
-      navigate('/');
+    } else if (data.user) {
+      // Força a busca do perfil mais recente no momento do login
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profileError) {
+        showError('Não foi possível carregar os dados do perfil.');
+        await supabase.auth.signOut();
+      } else {
+        setProfile(userProfile);
+        setCurrentUser(data.user);
+        showSuccess('Login realizado com sucesso!');
+        navigate('/');
+      }
     }
   };
 
   const logout = async () => {
     await supabase.auth.signOut();
+    setProfile(null);
+    setCurrentUser(null);
     navigate('/login');
   };
 
