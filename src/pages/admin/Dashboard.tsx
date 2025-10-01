@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import BackButton from '@/components/BackButton';
 import { Calendar } from '@/components/ui/calendar';
 import DailySchedule from '@/components/admin/DailySchedule';
+import { ptBR } from 'date-fns/locale';
 
 const AdminDashboard = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -27,6 +28,7 @@ const AdminDashboard = () => {
                   onSelect={setDate}
                   className="rounded-md"
                   initialFocus
+                  locale={ptBR}
                 />
               </CardContent>
             </Card>

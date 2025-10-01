@@ -9,6 +9,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { showSuccess, showError } from '@/utils/toast';
 import BackButton from '@/components/BackButton';
 import { format, startOfDay } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface Availability {
   id: string;
@@ -115,6 +116,7 @@ const AvailabilityPage = () => {
                 disabled={(date) => date < startOfDay(new Date())}
                 modifiers={{ available: availableDays }}
                 modifiersStyles={{ available: { border: "2px solid hsl(var(--primary))" } }}
+                locale={ptBR}
               />
             </div>
             <div className="space-y-4">
