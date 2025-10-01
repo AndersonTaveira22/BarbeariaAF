@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { add, format, setHours, setMinutes, startOfDay } from 'date-fns';
+import { add, format, set, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { showError } from '@/utils/toast';
 
@@ -32,7 +32,6 @@ const DateTimePicker = ({ barber, onDateTimeSelect }: DateTimePickerProps) => {
 
       const selectedDate = format(date, 'yyyy-MM-dd');
 
-      // Busca a disponibilidade do barbeiro para a data específica
       const { data: availability, error: availabilityError } = await supabase
         .from('barber_availability')
         .select('start_time, end_time')
@@ -45,7 +44,6 @@ const DateTimePicker = ({ barber, onDateTimeSelect }: DateTimePickerProps) => {
         return;
       }
 
-      // Busca agendamentos existentes para o dia selecionado
       const startOfDayUTC = startOfDay(date).toISOString();
       const endOfDayUTC = add(startOfDay(date), { days: 1, seconds: -1 }).toISOString();
 
@@ -64,15 +62,15 @@ const DateTimePicker = ({ barber, onDateTimeSelect }: DateTimePickerProps) => {
 
       const bookedTimes = appointments?.map(a => new Date(a.appointment_time).getTime()) || [];
 
-      // Gera os horários
       const slots: Date[] = [];
       const [startHour, startMinute] = availability.start_time.split(':').map(Number);
       const [endHour, endMinute] = availability.end_time.split(':').map(Number);
       
-      const slotDuration = 45; // Duração de 45 minutos por serviço
+      const slotDuration = 45;
 
-      let currentTime = setMinutes(setHours(startOfDay(date), startHour), startMinute);
-      const endTime = setMinutes(setHours(startOfDay(date), endHour), endMinute);
+      let baseDate = startOfDay(date);
+      let currentTime = set(baseDate, { hours: startHour, minutes: startMinute });
+      const endTime = set(baseDate, { hours: endHour, minutes: endMinute });
 
       while (currentTime < endTime) {
         if (currentTime > new Date() && !bookedTimes.includes(currentTime.getTime())) {
