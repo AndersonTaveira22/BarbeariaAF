@@ -30,18 +30,17 @@ const DateTimePicker = ({ barber, onDateTimeSelect }: DateTimePickerProps) => {
       setLoading(true);
       setTimeSlots([]);
 
-      const dayOfWeek = date.getDay(); // Domingo = 0, Segunda = 1, etc.
+      const selectedDate = format(date, 'yyyy-MM-dd');
 
-      // Busca a disponibilidade do barbeiro para o dia selecionado
+      // Busca a disponibilidade do barbeiro para a data específica
       const { data: availability, error: availabilityError } = await supabase
         .from('barber_availability')
         .select('start_time, end_time')
         .eq('barber_id', barber.id)
-        .eq('day_of_week', dayOfWeek)
+        .eq('date', selectedDate)
         .single();
 
       if (availabilityError || !availability) {
-        // Nenhuma disponibilidade encontrada para este dia
         setLoading(false);
         return;
       }
@@ -70,14 +69,12 @@ const DateTimePicker = ({ barber, onDateTimeSelect }: DateTimePickerProps) => {
       const [startHour, startMinute] = availability.start_time.split(':').map(Number);
       const [endHour, endMinute] = availability.end_time.split(':').map(Number);
       
-      // Assumindo uma duração de 1 hora por serviço por enquanto
-      const slotDuration = 60; 
+      const slotDuration = 60; // Duração de 1 hora por serviço
 
       let currentTime = setMinutes(setHours(startOfDay(date), startHour), startMinute);
       const endTime = setMinutes(setHours(startOfDay(date), endHour), endMinute);
 
       while (currentTime < endTime) {
-        // Verifica se o horário é futuro e não está agendado
         if (currentTime > new Date() && !bookedTimes.includes(currentTime.getTime())) {
           slots.push(new Date(currentTime));
         }

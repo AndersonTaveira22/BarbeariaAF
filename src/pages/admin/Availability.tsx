@@ -5,25 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
 import { showSuccess, showError } from '@/utils/toast';
-import { Trash2 } from 'lucide-react';
 import BackButton from '@/components/BackButton';
+import { format, startOfDay } from 'date-fns';
 
-const daysOfWeek = [
-  { value: 1, label: 'Segunda-feira' },
-  { value: 2, label: 'Terça-feira' },
-  { value: 3, label: 'Quarta-feira' },
-  { value: 4, label: 'Quinta-feira' },
-  { value: 5, label: 'Sexta-feira' },
-  { value: 6, label: 'Sábado' },
-  { value: 0, label: 'Domingo' },
-];
+interface Availability {
+  id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+}
 
-const Availability = () => {
+const AvailabilityPage = () => {
   const { currentUser } = useAuth();
-  const [availabilities, setAvailabilities] = useState([]);
-  const [day, setDay] = useState('1');
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('18:00');
 
@@ -32,10 +29,9 @@ const Availability = () => {
     const { data, error } = await supabase
       .from('barber_availability')
       .select('*')
-      .eq('barber_id', currentUser.id)
-      .order('day_of_week', { ascending: true });
+      .eq('barber_id', currentUser.id);
     if (error) {
-      showError('Erro ao buscar horários.');
+      showError('Erro ao buscar disponibilidades.');
     } else {
       setAvailabilities(data);
     }
@@ -45,16 +41,31 @@ const Availability = () => {
     fetchAvailabilities();
   }, [currentUser]);
 
-  const handleAddAvailability = async (e) => {
-    e.preventDefault();
-    if (!currentUser) return;
+  useEffect(() => {
+    if (selectedDate) {
+      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+      const existing = availabilities.find(a => a.date === formattedDate);
+      if (existing) {
+        setStartTime(existing.start_time.slice(0, 5));
+        setEndTime(existing.end_time.slice(0, 5));
+      } else {
+        setStartTime('09:00');
+        setEndTime('18:00');
+      }
+    }
+  }, [selectedDate, availabilities]);
+
+  const handleSave = async () => {
+    if (!currentUser || !selectedDate) return;
+
+    const formattedDate = format(selectedDate, 'yyyy-MM-dd');
 
     const { error } = await supabase.from('barber_availability').upsert({
       barber_id: currentUser.id,
-      day_of_week: parseInt(day),
+      date: formattedDate,
       start_time: startTime,
       end_time: endTime,
-    }, { onConflict: 'barber_id,day_of_week' });
+    }, { onConflict: 'barber_id,date' });
 
     if (error) {
       showError('Erro ao salvar horário: ' + error.message);
@@ -64,67 +75,63 @@ const Availability = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    const { error } = await supabase.from('barber_availability').delete().eq('id', id);
+  const handleDelete = async () => {
+    if (!currentUser || !selectedDate) return;
+    const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+    const existing = availabilities.find(a => a.date === formattedDate);
+
+    if (!existing) {
+      showError('Nenhum horário para remover nesta data.');
+      return;
+    }
+
+    const { error } = await supabase.from('barber_availability').delete().eq('id', existing.id);
     if (error) {
-      showError('Erro ao deletar horário.');
+      showError('Erro ao remover horário.');
     } else {
       showSuccess('Horário removido.');
       fetchAvailabilities();
     }
-  }
+  };
+
+  const availableDays = availabilities.map(a => new Date(a.date + 'T00:00:00'));
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-8">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <BackButton />
         <Card>
           <CardHeader>
             <CardTitle className="text-3xl font-serif">Gerenciar Disponibilidade</CardTitle>
-            <CardDescription>Adicione ou atualize seus horários de trabalho semanais.</CardDescription>
+            <CardDescription>Selecione um dia no calendário e defina seus horários de trabalho.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAddAvailability} className="grid gap-4 mb-8 p-4 border rounded-lg">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="grid gap-2">
-                  <Label>Dia da Semana</Label>
-                  <Select value={day} onValueChange={setDay}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o dia" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {daysOfWeek.map(d => <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="start-time">Início</Label>
-                  <Input id="start-time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="end-time">Fim</Label>
-                  <Input id="end-time" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
-                </div>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="flex justify-center">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                className="rounded-md border"
+                disabled={(date) => date < startOfDay(new Date())}
+                modifiers={{ available: availableDays }}
+                modifiersStyles={{ available: { border: "2px solid hsl(var(--primary))" } }}
+              />
+            </div>
+            <div className="space-y-4">
+              <h3 className="text-xl font-serif text-center">
+                {selectedDate ? format(selectedDate, 'dd \'de\' MMMM, yyyy') : 'Selecione uma data'}
+              </h3>
+              <div className="grid gap-2">
+                <Label htmlFor="start-time">Início</Label>
+                <Input id="start-time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
               </div>
-              <Button type="submit" className="w-full sm:w-auto justify-self-end">Salvar Horário</Button>
-            </form>
-
-            <div>
-              <h3 className="text-xl font-serif mb-4">Sua Agenda Semanal</h3>
-              <div className="space-y-2">
-                {availabilities.length > 0 ? (
-                  availabilities.map(avail => (
-                    <div key={avail.id} className="flex justify-between items-center p-3 bg-card rounded-md">
-                      <span className="font-medium">{daysOfWeek.find(d => d.value === avail.day_of_week)?.label}</span>
-                      <span>{avail.start_time.slice(0, 5)} - {avail.end_time.slice(0, 5)}</span>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(avail.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-muted-foreground">Nenhum horário de trabalho cadastrado.</p>
-                )}
+              <div className="grid gap-2">
+                <Label htmlFor="end-time">Fim</Label>
+                <Input id="end-time" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSave} className="flex-1">Salvar Horário</Button>
+                <Button onClick={handleDelete} variant="destructive" className="flex-1">Remover Horário</Button>
               </div>
             </div>
           </CardContent>
@@ -134,4 +141,4 @@ const Availability = () => {
   );
 };
 
-export default Availability;
+export default AvailabilityPage;
