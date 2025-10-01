@@ -14,15 +14,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/AuthContext';
 
 const Login = () => {
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Adicionar o código do país (Brasil)
-    const fullPhone = `+55${phone.replace(/\D/g, '')}`;
-    await login(fullPhone, password);
+    await login(email, password);
   };
 
   return (
@@ -31,20 +29,20 @@ const Login = () => {
         <CardHeader>
           <CardTitle className="text-3xl font-serif">Login</CardTitle>
           <CardDescription>
-            Entre com seu celular para acessar sua conta
+            Entre com seu email para acessar sua conta
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-2">
-              <Label htmlFor="phone">Celular (com DDD)</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="phone"
-                type="tel"
-                placeholder="21999998888"
+                id="email"
+                type="email"
+                placeholder="seu@email.com"
                 required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div className="grid gap-2">

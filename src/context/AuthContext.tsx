@@ -7,12 +7,13 @@ import { Session, User } from '@supabase/supabase-js';
 interface Profile {
   full_name: string;
   role: 'cliente' | 'admin';
+  avatar_url: string;
 }
 
 interface AuthContextType {
   currentUser: User | null;
   profile: Profile | null;
-  login: (phone, password) => Promise<void>;
+  login: (email, password) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -58,12 +59,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (phone, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ phone, password });
+  const login = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       showError(error.message);
     } else if (data.user) {
-      // Força a busca do perfil mais recente no momento do login
       const { data: userProfile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
