@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { add, format, startOfDay } from 'date-fns';
+import { add, format, startOfDay, set } from 'date-fns'; // Import 'set'
 import { ptBR } from 'date-fns/locale';
 import { showError } from '@/utils/toast';
 
@@ -45,20 +45,27 @@ const DateTimePicker = ({ barber, onDateTimeSelect }: DateTimePickerProps) => {
       const { data: appointments } = await supabase.from('appointments').select('appointment_time').eq('barber_id', barber.id).gte('appointment_time', startOfDayUTC).lte('appointment_time', endOfDayUTC);
       const { data: blockedSlots } = await supabase.from('blocked_slots').select('start_time').eq('barber_id', barber.id).gte('start_time', startOfDayUTC).lte('start_time', endOfDayUTC);
 
-      const bookedTimes = appointments?.map(a => new Date(a.appointment_time).getTime()) || [];
-      const blockedTimes = blockedSlots?.map(s => new Date(s.start_time).getTime()) || [];
+      // Normalize milliseconds for comparison
+      const bookedTimes = appointments?.map(a => set(new Date(a.appointment_time), { milliseconds: 0 }).getTime()) || [];
+      const blockedTimes = blockedSlots?.map(s => set(new Date(s.start_time), { milliseconds: 0 }).getTime()) || [];
       
       const slots: Date[] = [];
       const slotDuration = 45;
-      const startTime = new Date(`${selectedDateStr}T${availability.start_time}`);
+      
+      let currentTime = new Date(`${selectedDateStr}T${availability.start_time}`);
+      currentTime = set(currentTime, { milliseconds: 0 }); // Normalize milliseconds
+      
       const endTime = new Date(`${selectedDateStr}T${availability.end_time}`);
-      let currentTime = startTime;
+      const normalizedEndTime = set(endTime, { milliseconds: 0 }); // Normalize for comparison
 
-      while (currentTime < endTime) {
-        if (currentTime > new Date() && !bookedTimes.includes(currentTime.getTime()) && !blockedTimes.includes(currentTime.getTime())) {
+      while (currentTime < normalizedEndTime) {
+        const currentSlotTime = currentTime.getTime();
+        // Para o dia de hoje, não mostra horários que já passaram
+        if (currentTime > new Date() && !bookedTimes.includes(currentSlotTime) && !blockedTimes.includes(currentSlotTime)) {
           slots.push(new Date(currentTime));
         }
         currentTime = add(currentTime, { minutes: slotDuration });
+        currentTime = set(currentTime, { milliseconds: 0 }); // Normalize after adding minutes
       }
 
       setTimeSlots(slots);

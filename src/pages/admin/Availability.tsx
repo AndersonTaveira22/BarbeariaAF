@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { showSuccess, showError } from '@/utils/toast';
 import BackButton from '@/components/BackButton';
-import { format, startOfDay, endOfDay, add } from 'date-fns';
+import { format, startOfDay, endOfDay, add, set } from 'date-fns'; // Import 'set'
 import { ptBR } from 'date-fns/locale';
 
 interface Availability {
@@ -97,16 +97,21 @@ const AvailabilityPage = () => {
     if (breakStartTime && breakEndTime) {
       const breakSlots = [];
       const slotDuration = 45;
+      
       let currentTime = new Date(`${formattedDate}T${breakStartTime}`);
+      currentTime = set(currentTime, { milliseconds: 0 }); // Normalize milliseconds
+      
       const breakEnd = new Date(`${formattedDate}T${breakEndTime}`);
+      const normalizedBreakEnd = set(breakEnd, { milliseconds: 0 }); // Normalize milliseconds for comparison
 
-      while (currentTime < breakEnd) {
+      while (currentTime < normalizedBreakEnd) {
         breakSlots.push({
           barber_id: currentUser.id,
           start_time: currentTime.toISOString(),
           end_time: add(currentTime, { minutes: slotDuration }).toISOString(),
         });
         currentTime = add(currentTime, { minutes: slotDuration });
+        currentTime = set(currentTime, { milliseconds: 0 }); // Normalize after adding minutes
       }
 
       if (breakSlots.length > 0) {
