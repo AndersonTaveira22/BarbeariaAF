@@ -7,16 +7,16 @@ const Index = () => {
   const { currentUser, profile, logout } = useAuth();
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background">
       <div className="text-center p-8">
-        <h1 className="text-5xl font-bold mb-4">Bem-vindo à Barbearia AF</h1>
+        <h1 className="text-6xl font-serif font-bold mb-4 text-foreground">Bem-vindo à Barbearia AF</h1>
         {currentUser && profile ? (
           <div>
-            <p className="text-xl text-gray-600 dark:text-gray-300 mb-6">
+            <p className="text-xl text-muted-foreground mb-8">
               Olá, {profile.full_name}! O que vamos fazer hoje?
             </p>
             <div className="space-x-4">
-               <Button asChild>
+               <Button asChild size="lg">
                 <Link to="/new-appointment">Novo Agendamento</Link>
               </Button>
               <Button variant="outline" onClick={logout}>
@@ -26,14 +26,14 @@ const Index = () => {
           </div>
         ) : (
           <div>
-            <p className="text-xl text-gray-600 dark:text-gray-300 mb-6">
+            <p className="text-xl text-muted-foreground mb-8">
               Agende seu horário de forma rápida e fácil.
             </p>
             <div className="space-x-4">
-              <Button asChild>
+              <Button asChild size="lg">
                 <Link to="/login">Login</Link>
               </Button>
-              <Button asChild variant="secondary">
+              <Button asChild variant="secondary" size="lg">
                 <Link to="/register">Cadastre-se</Link>
               </Button>
             </div>

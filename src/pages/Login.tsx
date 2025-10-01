@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -23,10 +23,10 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-      <Card className="mx-auto max-w-sm">
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Card className="mx-auto max-w-sm border-border">
         <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
+          <CardTitle className="text-3xl font-serif">Login</CardTitle>
           <CardDescription>
             Entre com seu e-mail para acessar sua conta
           </CardDescription>
@@ -50,7 +50,7 @@ const Login = () => {
                   <Label htmlFor="password">Senha</Label>
                   <Link
                     to="#"
-                    className="ml-auto inline-block text-sm underline"
+                    className="ml-auto inline-block text-sm text-primary hover:underline"
                   >
                     Esqueceu sua senha?
                   </Link>
@@ -70,7 +70,7 @@ const Login = () => {
           </form>
           <div className="mt-4 text-center text-sm">
             Não tem uma conta?{' '}
-            <Link to="/register" className="underline">
+            <Link to="/register" className="underline text-primary">
               Cadastre-se
             </Link>
           </div>

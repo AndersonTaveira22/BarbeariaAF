@@ -31,10 +31,10 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-      <Card className="mx-auto max-w-sm">
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Card className="mx-auto max-w-sm border-border">
         <CardHeader>
-          <CardTitle className="text-xl">Cadastro</CardTitle>
+          <CardTitle className="text-3xl font-serif">Cadastro</CardTitle>
           <CardDescription>
             Crie sua conta para agendar seu horário
           </CardDescription>
@@ -76,7 +76,7 @@ const Register = () => {
           </form>
           <div className="mt-4 text-center text-sm">
             Já tem uma conta?{' '}
-            <Link to="/login" className="underline">
+            <Link to="/login" className="underline text-primary">
               Login
             </Link>
           </div>
