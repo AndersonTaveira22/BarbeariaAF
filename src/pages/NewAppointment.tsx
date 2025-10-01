@@ -131,7 +131,7 @@ const NewAppointment = () => {
                 {services.map((service) => (
                   <Card
                     key={service.id}
-                    className="cursor-pointer hover:border-primary transition-colors"
+                    className="cursor-pointer hover:border-primary transition-all duration-300 ease-in-out hover:-translate-y-1"
                     onClick={() => handleSelectService(service)}
                   >
                     <CardContent className="p-6 flex justify-between items-center">
@@ -159,7 +159,7 @@ const NewAppointment = () => {
                 {barbers.map((barber) => (
                   <Card
                     key={barber.id}
-                    className="cursor-pointer hover:border-primary transition-colors"
+                    className="cursor-pointer hover:border-primary transition-all duration-300 ease-in-out hover:-translate-y-1"
                     onClick={() => handleSelectBarber(barber)}
                   >
                     <CardContent className="p-6 flex items-center gap-4">
