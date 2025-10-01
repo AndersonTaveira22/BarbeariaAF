@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { showSuccess, showError } from '@/utils/toast';
 import BackButton from '@/components/BackButton';
-import { format, startOfDay } from 'date-fns';
+import { format, startOfDay, add } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface Availability {
@@ -24,6 +24,8 @@ const AvailabilityPage = () => {
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('18:00');
+  const [breakStartTime, setBreakStartTime] = useState('');
+  const [breakEndTime, setBreakEndTime] = useState('');
 
   const fetchAvailabilities = async () => {
     if (!currentUser) return;
@@ -53,6 +55,9 @@ const AvailabilityPage = () => {
         setStartTime('09:00');
         setEndTime('18:00');
       }
+      // Reset break times when changing date
+      setBreakStartTime('');
+      setBreakEndTime('');
     }
   }, [selectedDate, availabilities]);
 
@@ -61,19 +66,46 @@ const AvailabilityPage = () => {
 
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
 
-    const { error } = await supabase.from('barber_availability').upsert({
+    // 1. Save the main availability
+    const { error: availabilityError } = await supabase.from('barber_availability').upsert({
       barber_id: currentUser.id,
       date: formattedDate,
       start_time: startTime,
       end_time: endTime,
     }, { onConflict: 'barber_id,date' });
 
-    if (error) {
-      showError('Erro ao salvar horário: ' + error.message);
-    } else {
-      showSuccess('Horário salvo com sucesso!');
-      fetchAvailabilities();
+    if (availabilityError) {
+      showError('Erro ao salvar horário: ' + availabilityError.message);
+      return;
     }
+
+    // 2. If break times are provided, create blocked slots
+    if (breakStartTime && breakEndTime) {
+      const breakSlots = [];
+      const slotDuration = 45;
+      let currentTime = new Date(`${formattedDate}T${breakStartTime}`);
+      const breakEnd = new Date(`${formattedDate}T${breakEndTime}`);
+
+      while (currentTime < breakEnd) {
+        breakSlots.push({
+          barber_id: currentUser.id,
+          start_time: currentTime.toISOString(),
+          end_time: add(currentTime, { minutes: slotDuration }).toISOString(),
+        });
+        currentTime = add(currentTime, { minutes: slotDuration });
+      }
+
+      if (breakSlots.length > 0) {
+        const { error: blockError } = await supabase.from('blocked_slots').insert(breakSlots);
+        if (blockError) {
+          showError('Erro ao bloquear horários de intervalo: ' + blockError.message);
+          return;
+        }
+      }
+    }
+
+    showSuccess('Disponibilidade salva com sucesso!');
+    fetchAvailabilities();
   };
 
   const handleDelete = async () => {
@@ -104,7 +136,7 @@ const AvailabilityPage = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-3xl font-serif">Gerenciar Disponibilidade</CardTitle>
-            <CardDescription>Selecione um dia no calendário e defina seus horários de trabalho.</CardDescription>
+            <CardDescription>Selecione um dia, defina seus horários de trabalho e adicione um intervalo se necessário.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="flex justify-center">
@@ -120,20 +152,33 @@ const AvailabilityPage = () => {
               />
             </div>
             <div className="space-y-4">
-              <h3 className="text-xl font-serif text-center">
-                {selectedDate ? format(selectedDate, 'dd \'de\' MMMM, yyyy') : 'Selecione uma data'}
-              </h3>
-              <div className="grid gap-2">
-                <Label htmlFor="start-time">Início</Label>
-                <Input id="start-time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+              <div>
+                <h3 className="text-xl font-serif text-center mb-4">
+                  {selectedDate ? format(selectedDate, 'dd \'de\' MMMM, yyyy', { locale: ptBR }) : 'Selecione uma data'}
+                </h3>
+                <div className="grid gap-2">
+                  <Label htmlFor="start-time">Início do Expediente</Label>
+                  <Input id="start-time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                </div>
+                <div className="grid gap-2 mt-2">
+                  <Label htmlFor="end-time">Fim do Expediente</Label>
+                  <Input id="end-time" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="end-time">Fim</Label>
-                <Input id="end-time" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+              <div className="border-t pt-4">
+                 <h4 className="text-lg font-serif text-center mb-4">Adicionar Intervalo (Opcional)</h4>
+                 <div className="grid gap-2">
+                  <Label htmlFor="break-start-time">Início do Intervalo</Label>
+                  <Input id="break-start-time" type="time" value={breakStartTime} onChange={e => setBreakStartTime(e.target.value)} />
+                </div>
+                <div className="grid gap-2 mt-2">
+                  <Label htmlFor="break-end-time">Fim do Intervalo</Label>
+                  <Input id="break-end-time" type="time" value={breakEndTime} onChange={e => setBreakEndTime(e.target.value)} />
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button onClick={handleSave} className="flex-1">Salvar Horário</Button>
-                <Button onClick={handleDelete} variant="destructive" className="flex-1">Remover Horário</Button>
+              <div className="flex gap-2 pt-4">
+                <Button onClick={handleSave} className="flex-1">Salvar</Button>
+                <Button onClick={handleDelete} variant="destructive" className="flex-1">Remover Dia</Button>
               </div>
             </div>
           </CardContent>
