@@ -31,48 +31,31 @@ const DateTimePicker = ({ barber, onDateTimeSelect }: DateTimePickerProps) => {
       setTimeSlots([]);
 
       const selectedDateStr = format(date, 'yyyy-MM-dd');
+      const startOfDayUTC = startOfDay(date).toISOString();
+      const endOfDayUTC = add(startOfDay(date), { days: 1, seconds: -1 }).toISOString();
 
       const { data: availability, error: availabilityError } = await supabase
-        .from('barber_availability')
-        .select('start_time, end_time')
-        .eq('barber_id', barber.id)
-        .eq('date', selectedDateStr)
-        .single();
+        .from('barber_availability').select('start_time, end_time').eq('barber_id', barber.id).eq('date', selectedDateStr).single();
 
       if (availabilityError || !availability) {
         setLoading(false);
         return;
       }
 
-      const startOfDayUTC = startOfDay(date).toISOString();
-      const endOfDayUTC = add(startOfDay(date), { days: 1, seconds: -1 }).toISOString();
-
-      const { data: appointments, error: appointmentsError } = await supabase
-        .from('appointments')
-        .select('appointment_time')
-        .eq('barber_id', barber.id)
-        .gte('appointment_time', startOfDayUTC)
-        .lte('appointment_time', endOfDayUTC);
-
-      if (appointmentsError) {
-        showError('Erro ao buscar agendamentos existentes.');
-        setLoading(false);
-        return;
-      }
+      const { data: appointments } = await supabase.from('appointments').select('appointment_time').eq('barber_id', barber.id).gte('appointment_time', startOfDayUTC).lte('appointment_time', endOfDayUTC);
+      const { data: blockedSlots } = await supabase.from('blocked_slots').select('start_time').eq('barber_id', barber.id).gte('start_time', startOfDayUTC).lte('start_time', endOfDayUTC);
 
       const bookedTimes = appointments?.map(a => new Date(a.appointment_time).getTime()) || [];
+      const blockedTimes = blockedSlots?.map(s => new Date(s.start_time).getTime()) || [];
+      
       const slots: Date[] = [];
       const slotDuration = 45;
-      
-      // Constrói a data de início e fim de forma explícita para evitar problemas de fuso horário
       const startTime = new Date(`${selectedDateStr}T${availability.start_time}`);
       const endTime = new Date(`${selectedDateStr}T${availability.end_time}`);
-      
       let currentTime = startTime;
 
       while (currentTime < endTime) {
-        // Para o dia de hoje, não mostra horários que já passaram
-        if (currentTime > new Date() && !bookedTimes.includes(currentTime.getTime())) {
+        if (currentTime > new Date() && !bookedTimes.includes(currentTime.getTime()) && !blockedTimes.includes(currentTime.getTime())) {
           slots.push(new Date(currentTime));
         }
         currentTime = add(currentTime, { minutes: slotDuration });

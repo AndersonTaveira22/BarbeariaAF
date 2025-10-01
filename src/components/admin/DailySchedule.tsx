@@ -1,0 +1,158 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/context/AuthContext';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { add, format, startOfDay, endOfDay, isEqual } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Clock, User, Scissors, Lock, Unlock } from 'lucide-react';
+import { showError, showSuccess } from '@/utils/toast';
+
+interface Slot {
+  time: Date;
+  status: 'available' | 'booked' | 'blocked';
+  details?: {
+    id: string;
+    client_name?: string;
+    service_name?: string;
+  };
+}
+
+interface DailyScheduleProps {
+  selectedDate: Date | undefined;
+}
+
+const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
+  const { currentUser } = useAuth();
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchSchedule = useCallback(async () => {
+    if (!currentUser || !selectedDate) return;
+    setLoading(true);
+
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const start = startOfDay(selectedDate).toISOString();
+    const end = endOfDay(selectedDate).toISOString();
+
+    // 1. Fetch availability, appointments, and blocked slots in parallel
+    const [availabilityRes, appointmentsRes, blockedSlotsRes] = await Promise.all([
+      supabase.from('barber_availability').select('start_time, end_time').eq('barber_id', currentUser.id).eq('date', dateStr).single(),
+      supabase.from('appointments').select('id, appointment_time, profiles(full_name), services(name)').eq('barber_id', currentUser.id).gte('appointment_time', start).lte('appointment_time', end),
+      supabase.from('blocked_slots').select('id, start_time').eq('barber_id', currentUser.id).gte('start_time', start).lte('start_time', end)
+    ]);
+
+    const { data: availability, error: availabilityError } = availabilityRes;
+    if (availabilityError || !availability) {
+      setSlots([]);
+      setLoading(false);
+      return;
+    }
+
+    const { data: appointments } = appointmentsRes;
+    const { data: blockedSlots } = blockedSlotsRes;
+
+    const bookedTimes = appointments?.map(a => ({ time: new Date(a.appointment_time).getTime(), details: { id: a.id, client_name: (a.profiles as any)?.full_name, service_name: (a.services as any)?.name } })) || [];
+    const blockedTimes = blockedSlots?.map(b => ({ time: new Date(b.start_time).getTime(), details: { id: b.id } })) || [];
+
+    // 2. Generate all possible slots
+    const allSlots: Slot[] = [];
+    const slotDuration = 45;
+    const startTime = new Date(`${dateStr}T${availability.start_time}`);
+    const endTime = new Date(`${dateStr}T${availability.end_time}`);
+    let currentTime = startTime;
+
+    while (currentTime < endTime) {
+      const bookedSlot = bookedTimes.find(b => b.time === currentTime.getTime());
+      const blockedSlot = blockedTimes.find(b => b.time === currentTime.getTime());
+
+      if (bookedSlot) {
+        allSlots.push({ time: new Date(currentTime), status: 'booked', details: bookedSlot.details });
+      } else if (blockedSlot) {
+        allSlots.push({ time: new Date(currentTime), status: 'blocked', details: blockedSlot.details });
+      } else {
+        allSlots.push({ time: new Date(currentTime), status: 'available' });
+      }
+      currentTime = add(currentTime, { minutes: slotDuration });
+    }
+
+    setSlots(allSlots);
+    setLoading(false);
+  }, [selectedDate, currentUser]);
+
+  useEffect(() => {
+    fetchSchedule();
+  }, [fetchSchedule]);
+
+  const handleBlock = async (time: Date) => {
+    if (!currentUser) return;
+    const { error } = await supabase.from('blocked_slots').insert({
+      barber_id: currentUser.id,
+      start_time: time.toISOString(),
+      end_time: add(time, { minutes: 45 }).toISOString(),
+    });
+    if (error) showError('Erro ao bloquear horário.');
+    else {
+      showSuccess('Horário bloqueado.');
+      fetchSchedule();
+    }
+  };
+
+  const handleUnblock = async (slotId: string) => {
+    const { error } = await supabase.from('blocked_slots').delete().eq('id', slotId);
+    if (error) showError('Erro ao desbloquear horário.');
+    else {
+      showSuccess('Horário desbloqueado.');
+      fetchSchedule();
+    }
+  };
+
+  const formattedDate = selectedDate ? format(selectedDate, "eeee, dd 'de' MMMM", { locale: ptBR }) : 'Nenhuma data selecionada';
+
+  const renderSlot = (slot: Slot) => {
+    switch (slot.status) {
+      case 'booked':
+        return (
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center gap-2 text-muted-foreground"><User className="h-4 w-4" /><span>{slot.details?.client_name}</span></div>
+            <div className="flex items-center gap-2 text-muted-foreground"><Scissors className="h-4 w-4" /><span>{slot.details?.service_name}</span></div>
+          </div>
+        );
+      case 'blocked':
+        return <div className="flex-1 flex items-center gap-2 text-destructive"><Lock className="h-4 w-4" /><span>Horário Bloqueado</span></div>;
+      default:
+        return <div className="flex-1 flex items-center text-green-400">Disponível</div>;
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Agenda para {formattedDate}</CardTitle>
+        <CardDescription>Gerencie seus horários para o dia selecionado.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? <Skeleton className="h-40 w-full" /> : slots.length > 0 ? (
+          <div className="space-y-2">
+            {slots.map((slot) => (
+              <div key={slot.time.toISOString()} className="p-3 border rounded-lg bg-card flex items-center gap-4">
+                <div className="flex items-center gap-2 w-24">
+                  <Clock className="h-5 w-5 text-primary" />
+                  <p className="text-lg font-bold">{format(slot.time, 'HH:mm')}</p>
+                </div>
+                {renderSlot(slot)}
+                {slot.status === 'available' && <Button variant="outline" size="sm" onClick={() => handleBlock(slot.time)}><Lock className="mr-2 h-4 w-4" />Bloquear</Button>}
+                {slot.status === 'blocked' && <Button variant="secondary" size="sm" onClick={() => handleUnblock(slot.details!.id)}><Unlock className="mr-2 h-4 w-4" />Desbloquear</Button>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-center text-muted-foreground py-8">Nenhuma disponibilidade cadastrada para esta data.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default DailySchedule;

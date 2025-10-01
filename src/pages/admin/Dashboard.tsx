@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import BackButton from '@/components/BackButton';
 import { Calendar } from '@/components/ui/calendar';
-import DailyAppointments from '@/components/admin/DailyAppointments';
+import DailySchedule from '@/components/admin/DailySchedule';
 
 const AdminDashboard = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -44,7 +44,7 @@ const AdminDashboard = () => {
           </aside>
 
           <main className="lg:col-span-2">
-            <DailyAppointments selectedDate={date} />
+            <DailySchedule selectedDate={date} />
           </main>
         </div>
       </div>
