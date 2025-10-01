@@ -1,17 +1,48 @@
-// Update this page (the content is just a fallback if you fail to update the page)
-
 import { MadeWithDyad } from "@/components/made-with-dyad";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
+import { Link } from "react-router-dom";
 
 const Index = () => {
+  const { currentUser, logout } = useAuth();
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">
-          Start building your amazing project here!
-        </p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="text-center p-8">
+        <h1 className="text-5xl font-bold mb-4">Bem-vindo à Barbearia AF</h1>
+        {currentUser ? (
+          <div>
+            <p className="text-xl text-gray-600 dark:text-gray-300 mb-6">
+              Olá, {currentUser.name}! O que vamos fazer hoje?
+            </p>
+            <div className="space-x-4">
+               <Button asChild>
+                <Link to="/new-appointment">Novo Agendamento</Link>
+              </Button>
+              <Button variant="outline" onClick={logout}>
+                Sair
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <p className="text-xl text-gray-600 dark:text-gray-300 mb-6">
+              Agende seu horário de forma rápida e fácil.
+            </p>
+            <div className="space-x-4">
+              <Button asChild>
+                <Link to="/login">Login</Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link to="/register">Cadastre-se</Link>
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
-      <MadeWithDyad />
+      <div className="absolute bottom-4">
+        <MadeWithDyad />
+      </div>
     </div>
   );
 };
