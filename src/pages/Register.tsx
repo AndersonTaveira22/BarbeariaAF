@@ -21,13 +21,13 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const { register } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
       showError('As senhas não coincidem.');
       return;
     }
-    register(name, email, phone, password);
+    await register(name, email, phone, password);
   };
 
   return (

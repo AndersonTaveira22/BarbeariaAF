@@ -4,16 +4,16 @@ import { useAuth } from "@/context/AuthContext";
 import { Link } from "react-router-dom";
 
 const Index = () => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, profile, logout } = useAuth();
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900">
       <div className="text-center p-8">
         <h1 className="text-5xl font-bold mb-4">Bem-vindo à Barbearia AF</h1>
-        {currentUser ? (
+        {currentUser && profile ? (
           <div>
             <p className="text-xl text-gray-600 dark:text-gray-300 mb-6">
-              Olá, {currentUser.name}! O que vamos fazer hoje?
+              Olá, {profile.full_name}! O que vamos fazer hoje?
             </p>
             <div className="space-x-4">
                <Button asChild>
@@ -45,6 +45,3 @@ const Index = () => {
       </div>
     </div>
   );
-};
-
-export default Index;
