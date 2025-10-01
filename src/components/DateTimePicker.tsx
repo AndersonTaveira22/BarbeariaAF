@@ -45,9 +45,19 @@ const DateTimePicker = ({ barber, onDateTimeSelect }: DateTimePickerProps) => {
       const { data: appointments } = await supabase.from('appointments').select('appointment_time').eq('barber_id', barber.id).gte('appointment_time', startOfDayUTC).lte('appointment_time', endOfDayUTC);
       const { data: blockedSlots } = await supabase.from('blocked_slots').select('start_time').eq('barber_id', barber.id).gte('start_time', startOfDayUTC).lte('start_time', endOfDayUTC);
 
-      // Normalize milliseconds for comparison
-      const bookedTimes = appointments?.map(a => set(new Date(a.appointment_time), { milliseconds: 0 }).getTime()) || [];
-      const blockedTimes = blockedSlots?.map(s => set(new Date(s.start_time), { milliseconds: 0 }).getTime()) || [];
+      // Helper to convert UTC DB timestamp to local Date object for comparison
+      const toLocalTimeForComparison = (utcIsoString: string, targetDate: Date) => {
+        const utcDate = new Date(utcIsoString);
+        return set(startOfDay(targetDate), {
+          hours: utcDate.getHours(), // Get local hour component of the UTC date
+          minutes: utcDate.getMinutes(),
+          seconds: 0,
+          milliseconds: 0
+        });
+      };
+
+      const bookedTimes = appointments?.map(a => toLocalTimeForComparison(a.appointment_time, date).getTime()) || [];
+      const blockedTimes = blockedSlots?.map(s => toLocalTimeForComparison(s.start_time, date).getTime()) || [];
       
       const slots: Date[] = [];
       const slotDuration = 45;
@@ -58,10 +68,13 @@ const DateTimePicker = ({ barber, onDateTimeSelect }: DateTimePickerProps) => {
       const endTime = new Date(`${selectedDateStr}T${availability.end_time}`);
       const normalizedEndTime = set(endTime, { milliseconds: 0 }); // Normalize for comparison
 
+      // Normalize current time for comparison against generated slots
+      const now = set(new Date(), { seconds: 0, milliseconds: 0 });
+
       while (currentTime < normalizedEndTime) {
         const currentSlotTime = currentTime.getTime();
         // Para o dia de hoje, não mostra horários que já passaram
-        if (currentTime > new Date() && !bookedTimes.includes(currentSlotTime) && !blockedTimes.includes(currentSlotTime)) {
+        if (currentTime.getTime() > now.getTime() && !bookedTimes.includes(currentSlotTime) && !blockedTimes.includes(currentSlotTime)) {
           slots.push(new Date(currentTime));
         }
         currentTime = add(currentTime, { minutes: slotDuration });

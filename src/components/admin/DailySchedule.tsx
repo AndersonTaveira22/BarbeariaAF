@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { add, format, startOfDay, endOfDay, isEqual } from 'date-fns';
+import { add, format, startOfDay, endOfDay, set } from 'date-fns'; // Import 'set'
 import { ptBR } from 'date-fns/locale';
 import { Clock, User, Scissors, Lock, Unlock } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
@@ -53,19 +53,41 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     const { data: appointments } = appointmentsRes;
     const { data: blockedSlots } = blockedSlotsRes;
 
-    const bookedTimes = appointments?.map(a => ({ time: new Date(a.appointment_time).getTime(), details: { id: a.id, client_name: (a.profiles as any)?.full_name, service_name: (a.services as any)?.name } })) || [];
-    const blockedTimes = blockedSlots?.map(b => ({ time: new Date(b.start_time).getTime(), details: { id: b.id } })) || [];
+    // Helper to convert UTC DB timestamp to local Date object for comparison
+    const toLocalTimeForComparison = (utcIsoString: string, targetDate: Date) => {
+      const utcDate = new Date(utcIsoString);
+      return set(startOfDay(targetDate), {
+        hours: utcDate.getHours(), // Get local hour component of the UTC date
+        minutes: utcDate.getMinutes(),
+        seconds: 0,
+        milliseconds: 0
+      });
+    };
+
+    const bookedTimes = appointments?.map(a => ({
+      time: toLocalTimeForComparison(a.appointment_time, selectedDate).getTime(),
+      details: { id: a.id, client_name: (a.profiles as any)?.full_name, service_name: (a.services as any)?.name }
+    })) || [];
+
+    const blockedTimes = blockedSlots?.map(b => ({
+      time: toLocalTimeForComparison(b.start_time, selectedDate).getTime(),
+      details: { id: b.id }
+    })) || [];
 
     // 2. Generate all possible slots
     const allSlots: Slot[] = [];
     const slotDuration = 45;
-    const startTime = new Date(`${dateStr}T${availability.start_time}`);
+    
+    let currentTime = new Date(`${dateStr}T${availability.start_time}`);
+    currentTime = set(currentTime, { milliseconds: 0 }); // Normalize milliseconds
+    
     const endTime = new Date(`${dateStr}T${availability.end_time}`);
-    let currentTime = startTime;
+    const normalizedEndTime = set(endTime, { milliseconds: 0 }); // Normalize for comparison
 
-    while (currentTime < endTime) {
-      const bookedSlot = bookedTimes.find(b => b.time === currentTime.getTime());
-      const blockedSlot = blockedTimes.find(b => b.time === currentTime.getTime());
+    while (currentTime < normalizedEndTime) {
+      const currentSlotTime = currentTime.getTime();
+      const bookedSlot = bookedTimes.find(b => b.time === currentSlotTime);
+      const blockedSlot = blockedTimes.find(b => b.time === currentSlotTime);
 
       if (bookedSlot) {
         allSlots.push({ time: new Date(currentTime), status: 'booked', details: bookedSlot.details });
@@ -75,6 +97,7 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
         allSlots.push({ time: new Date(currentTime), status: 'available' });
       }
       currentTime = add(currentTime, { minutes: slotDuration });
+      currentTime = set(currentTime, { milliseconds: 0 }); // Normalize after adding minutes
     }
 
     setSlots(allSlots);
