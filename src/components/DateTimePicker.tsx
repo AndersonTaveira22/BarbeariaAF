@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { add, format, set, startOfDay } from 'date-fns';
+import { add, format, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { showError } from '@/utils/toast';
 
@@ -30,13 +30,13 @@ const DateTimePicker = ({ barber, onDateTimeSelect }: DateTimePickerProps) => {
       setLoading(true);
       setTimeSlots([]);
 
-      const selectedDate = format(date, 'yyyy-MM-dd');
+      const selectedDateStr = format(date, 'yyyy-MM-dd');
 
       const { data: availability, error: availabilityError } = await supabase
         .from('barber_availability')
         .select('start_time, end_time')
         .eq('barber_id', barber.id)
-        .eq('date', selectedDate)
+        .eq('date', selectedDateStr)
         .single();
 
       if (availabilityError || !availability) {
@@ -61,18 +61,17 @@ const DateTimePicker = ({ barber, onDateTimeSelect }: DateTimePickerProps) => {
       }
 
       const bookedTimes = appointments?.map(a => new Date(a.appointment_time).getTime()) || [];
-
       const slots: Date[] = [];
-      const [startHour, startMinute] = availability.start_time.split(':').map(Number);
-      const [endHour, endMinute] = availability.end_time.split(':').map(Number);
-      
       const slotDuration = 45;
-
-      let baseDate = startOfDay(date);
-      let currentTime = set(baseDate, { hours: startHour, minutes: startMinute });
-      const endTime = set(baseDate, { hours: endHour, minutes: endMinute });
+      
+      // Constrói a data de início e fim de forma explícita para evitar problemas de fuso horário
+      const startTime = new Date(`${selectedDateStr}T${availability.start_time}`);
+      const endTime = new Date(`${selectedDateStr}T${availability.end_time}`);
+      
+      let currentTime = startTime;
 
       while (currentTime < endTime) {
+        // Para o dia de hoje, não mostra horários que já passaram
         if (currentTime > new Date() && !bookedTimes.includes(currentTime.getTime())) {
           slots.push(new Date(currentTime));
         }
