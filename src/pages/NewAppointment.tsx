@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import BackButton from '@/components/BackButton';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
+import DateTimePicker from '@/components/DateTimePicker';
+import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface Service {
   id: string;
@@ -28,8 +32,10 @@ const NewAppointment = () => {
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedBarber, setSelectedBarber] = useState<Barber | null>(null);
+  const [appointmentTime, setAppointmentTime] = useState<Date | null>(null);
   const [loadingServices, setLoadingServices] = useState(true);
   const [loadingBarbers, setLoadingBarbers] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
 
   useEffect(() => {
     if (!currentUser) {
@@ -79,8 +85,35 @@ const NewAppointment = () => {
 
   const handleSelectBarber = (barber: Barber) => {
     setSelectedBarber(barber);
-    alert(`Você selecionou o barbeiro: ${barber.full_name}. Próximo passo: escolher data e hora.`);
-    // setStep(3); // Próximo passo (a ser implementado)
+    setStep(3);
+  };
+
+  const handleDateTimeSelect = (dateTime: Date) => {
+    setAppointmentTime(dateTime);
+    setStep(4);
+  };
+
+  const handleConfirmBooking = async () => {
+    if (!currentUser || !selectedService || !selectedBarber || !appointmentTime) {
+      showError("Informações incompletas para o agendamento.");
+      return;
+    }
+    setIsBooking(true);
+    const { error } = await supabase.from('appointments').insert({
+      client_id: currentUser.id,
+      barber_id: selectedBarber.id,
+      service_id: selectedService.id,
+      appointment_time: appointmentTime.toISOString(),
+      status: 'agendado',
+    });
+
+    if (error) {
+      showError(`Erro ao agendar: ${error.message}`);
+    } else {
+      showSuccess('Agendamento realizado com sucesso!');
+      navigate('/');
+    }
+    setIsBooking(false);
   };
 
   const renderStepContent = () => {
@@ -142,6 +175,25 @@ const NewAppointment = () => {
             )}
           </div>
         );
+      case 3:
+        return (
+          <div>
+            <h2 className="text-2xl font-semibold mb-6 font-serif">Passo 3: Escolha a Data e Hora</h2>
+            <DateTimePicker barber={selectedBarber!} onDateTimeSelect={handleDateTimeSelect} />
+          </div>
+        );
+      case 4:
+        return (
+          <div>
+            <h2 className="text-2xl font-semibold mb-6 font-serif">Passo 4: Confirme seu Agendamento</h2>
+            <div className="space-y-4 p-4 border rounded-lg bg-card">
+              <p><strong>Serviço:</strong> {selectedService?.name}</p>
+              <p><strong>Barbeiro:</strong> {selectedBarber?.full_name}</p>
+              <p><strong>Data e Hora:</strong> {appointmentTime ? format(appointmentTime, "eeee, dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR }) : ''}</p>
+              <p className="text-lg font-bold"><strong>Total:</strong> R$ {selectedService?.price.toFixed(2).replace('.', ',')}</p>
+            </div>
+          </div>
+        );
       default:
         return <div>Carregando...</div>;
     }
@@ -159,6 +211,13 @@ const NewAppointment = () => {
           <CardContent>
             {renderStepContent()}
           </CardContent>
+          {step === 4 && (
+            <CardFooter>
+              <Button onClick={handleConfirmBooking} disabled={isBooking} className="w-full">
+                {isBooking ? 'Agendando...' : 'Confirmar Agendamento'}
+              </Button>
+            </CardFooter>
+          )}
         </Card>
       </div>
     </div>
