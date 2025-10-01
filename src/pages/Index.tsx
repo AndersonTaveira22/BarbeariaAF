@@ -15,7 +15,7 @@ const Index = () => {
             <p className="text-xl text-muted-foreground mb-8">
               Olá, {profile.full_name}! O que vamos fazer hoje?
             </p>
-            <div className="space-x-4">
+            <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
                <Button asChild size="lg">
                 <Link to="/new-appointment">Novo Agendamento</Link>
               </Button>
@@ -34,7 +34,7 @@ const Index = () => {
             <p className="text-xl text-muted-foreground mb-8">
               Agende seu horário de forma rápida e fácil.
             </p>
-            <div className="space-x-4">
+            <div className="flex flex-col sm:flex-row gap-4">
               <Button asChild size="lg">
                 <Link to="/login">Login</Link>
               </Button>
