@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import BackButton from '@/components/BackButton';
+import { showError } from '@/utils/toast';
 
 interface Service {
   id: string;
@@ -12,13 +14,22 @@ interface Service {
   price: number;
 }
 
+interface Barber {
+  id: string;
+  full_name: string;
+  avatar_url: string;
+}
+
 const NewAppointment = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [services, setServices] = useState<Service[]>([]);
+  const [barbers, setBarbers] = useState<Barber[]>([]);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [selectedBarber, setSelectedBarber] = useState<Barber | null>(null);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [loadingBarbers, setLoadingBarbers] = useState(false);
 
   useEffect(() => {
     if (!currentUser) {
@@ -27,23 +38,49 @@ const NewAppointment = () => {
     }
 
     const fetchServices = async () => {
-      setLoading(true);
+      setLoadingServices(true);
       const { data, error } = await supabase.from('services').select('*');
       if (error) {
-        console.error('Error fetching services:', error);
+        showError('Erro ao buscar serviços.');
       } else {
         setServices(data);
       }
-      setLoading(false);
+      setLoadingServices(false);
     };
 
     fetchServices();
   }, [currentUser, navigate]);
 
+  useEffect(() => {
+    const fetchBarbers = async () => {
+      setLoadingBarbers(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .eq('role', 'admin');
+      
+      if (error) {
+          showError('Erro ao buscar barbeiros.');
+      } else {
+          setBarbers(data);
+      }
+      setLoadingBarbers(false);
+    };
+
+    if (step === 2) {
+      fetchBarbers();
+    }
+  }, [step]);
+
   const handleSelectService = (service: Service) => {
     setSelectedService(service);
-    alert(`Você selecionou: ${service.name}. O próximo passo será escolher o barbeiro.`);
-    // setStep(2); // Próximo passo
+    setStep(2);
+  };
+
+  const handleSelectBarber = (barber: Barber) => {
+    setSelectedBarber(barber);
+    alert(`Você selecionou o barbeiro: ${barber.full_name}. Próximo passo: escolher data e hora.`);
+    // setStep(3); // Próximo passo (a ser implementado)
   };
 
   const renderStepContent = () => {
@@ -52,11 +89,9 @@ const NewAppointment = () => {
         return (
           <div>
             <h2 className="text-2xl font-semibold mb-6 font-serif">Passo 1: Escolha o Serviço</h2>
-            {loading ? (
+            {loadingServices ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[...Array(4)].map((_, i) => (
-                  <Skeleton key={i} className="h-24 w-full bg-card" />
-                ))}
+                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 w-full bg-card" />)}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -71,6 +106,35 @@ const NewAppointment = () => {
                       <p className="text-lg font-semibold text-primary">
                         R$ {service.price.toFixed(2).replace('.', ',')}
                       </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      case 2:
+        return (
+          <div>
+            <h2 className="text-2xl font-semibold mb-6 font-serif">Passo 2: Escolha o Barbeiro</h2>
+            {loadingBarbers ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-24 w-full bg-card" />)}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {barbers.map((barber) => (
+                  <Card
+                    key={barber.id}
+                    className="cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => handleSelectBarber(barber)}
+                  >
+                    <CardContent className="p-6 flex items-center gap-4">
+                      <Avatar className="h-16 w-16">
+                        <AvatarImage src={barber.avatar_url} alt={barber.full_name} />
+                        <AvatarFallback>{barber.full_name?.charAt(0) || 'B'}</AvatarFallback>
+                      </Avatar>
+                      <h3 className="text-lg font-medium font-sans">{barber.full_name}</h3>
                     </CardContent>
                   </Card>
                 ))}
