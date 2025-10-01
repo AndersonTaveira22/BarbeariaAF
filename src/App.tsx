@@ -8,6 +8,9 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NewAppointment from "./pages/NewAppointment";
+import AdminDashboard from "./pages/admin/Dashboard";
+import Availability from "./pages/admin/Availability";
+import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 
 const queryClient = new QueryClient();
@@ -19,11 +22,17 @@ const App = () => (
       <Sonner />
       <AuthProvider>
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/new-appointment" element={<NewAppointment />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+
+          {/* Admin Routes */}
+          <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/availability" element={<ProtectedRoute><Availability /></ProtectedRoute>} />
+
+          {/* Catch-all Route */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AuthProvider>

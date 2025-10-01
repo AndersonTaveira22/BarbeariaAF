@@ -19,6 +19,11 @@ const Index = () => {
                <Button asChild size="lg">
                 <Link to="/new-appointment">Novo Agendamento</Link>
               </Button>
+              {profile.role === 'admin' && (
+                <Button asChild variant="secondary" size="lg">
+                  <Link to="/admin/dashboard">Painel do Barbeiro</Link>
+                </Button>
+              )}
               <Button variant="outline" onClick={logout}>
                 Sair
               </Button>
