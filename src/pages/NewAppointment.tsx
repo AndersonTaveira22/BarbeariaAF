@@ -11,6 +11,8 @@ import DateTimePicker from '@/components/DateTimePicker';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface Service {
   id: string;
@@ -25,7 +27,7 @@ interface Barber {
 }
 
 const NewAppointment = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, profile } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [services, setServices] = useState<Service[]>([]);
@@ -33,6 +35,8 @@ const NewAppointment = () => {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedBarber, setSelectedBarber] = useState<Barber | null>(null);
   const [appointmentTime, setAppointmentTime] = useState<Date | null>(null);
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
   const [loadingServices, setLoadingServices] = useState(true);
   const [loadingBarbers, setLoadingBarbers] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
@@ -41,6 +45,11 @@ const NewAppointment = () => {
     if (!currentUser) {
       navigate('/login');
       return;
+    }
+
+    // Preenche o nome do cliente automaticamente se o perfil estiver disponível
+    if (profile?.full_name) {
+      setClientName(profile.full_name);
     }
 
     const fetchServices = async () => {
@@ -55,7 +64,7 @@ const NewAppointment = () => {
     };
 
     fetchServices();
-  }, [currentUser, navigate]);
+  }, [currentUser, navigate, profile]);
 
   useEffect(() => {
     const fetchBarbers = async () => {
@@ -90,11 +99,19 @@ const NewAppointment = () => {
 
   const handleDateTimeSelect = (dateTime: Date) => {
     setAppointmentTime(dateTime);
-    setStep(4);
+    setStep(4); // Move to step 4 to collect client info
+  };
+
+  const handleClientInfoSubmit = () => {
+    if (!clientName || !clientPhone) {
+      showError("Por favor, preencha seu nome e telefone.");
+      return;
+    }
+    setStep(5); // Move to confirmation step
   };
 
   const handleConfirmBooking = async () => {
-    if (!currentUser || !selectedService || !selectedBarber || !appointmentTime) {
+    if (!currentUser || !selectedService || !selectedBarber || !appointmentTime || !clientName || !clientPhone) {
       showError("Informações incompletas para o agendamento.");
       return;
     }
@@ -105,6 +122,8 @@ const NewAppointment = () => {
       service_id: selectedService.id,
       appointment_time: appointmentTime.toISOString(),
       status: 'agendado',
+      client_name: clientName, // Save client name
+      client_phone: clientPhone, // Save client phone
     });
 
     if (error) {
@@ -185,11 +204,46 @@ const NewAppointment = () => {
       case 4:
         return (
           <div>
-            <h2 className="text-2xl font-semibold mb-6 font-serif">Passo 4: Confirme seu Agendamento</h2>
+            <h2 className="text-2xl font-semibold mb-6 font-serif">Passo 4: Seus Dados</h2>
+            <div className="space-y-4 p-4 border rounded-lg bg-card">
+              <div className="grid gap-2">
+                <Label htmlFor="client-name">Seu Nome Completo</Label>
+                <Input
+                  id="client-name"
+                  type="text"
+                  placeholder="Seu Nome"
+                  required
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="client-phone">Seu Telefone</Label>
+                <Input
+                  id="client-phone"
+                  type="tel"
+                  placeholder="(XX) XXXXX-XXXX"
+                  required
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                />
+              </div>
+              <Button onClick={handleClientInfoSubmit} className="w-full">
+                Continuar
+              </Button>
+            </div>
+          </div>
+        );
+      case 5:
+        return (
+          <div>
+            <h2 className="text-2xl font-semibold mb-6 font-serif">Passo 5: Confirme seu Agendamento</h2>
             <div className="space-y-4 p-4 border rounded-lg bg-card">
               <p><strong>Serviço:</strong> {selectedService?.name}</p>
               <p><strong>Barbeiro:</strong> {selectedBarber?.full_name}</p>
               <p><strong>Data e Hora:</strong> {appointmentTime ? format(appointmentTime, "eeee, dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR }) : ''}</p>
+              <p><strong>Seu Nome:</strong> {clientName}</p>
+              <p><strong>Seu Telefone:</strong> {clientPhone}</p>
               <p className="text-lg font-bold"><strong>Total:</strong> R$ {selectedService?.price.toFixed(2).replace('.', ',')}</p>
             </div>
           </div>
@@ -211,7 +265,7 @@ const NewAppointment = () => {
           <CardContent>
             {renderStepContent()}
           </CardContent>
-          {step === 4 && (
+          {step === 5 && (
             <CardFooter>
               <Button onClick={handleConfirmBooking} disabled={isBooking} className="w-full">
                 {isBooking ? 'Agendando...' : 'Confirmar Agendamento'}
