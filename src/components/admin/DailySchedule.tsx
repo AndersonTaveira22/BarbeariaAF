@@ -138,8 +138,8 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       case 'booked':
         return (
           <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2 text-muted-foreground"><User className="h-4 w-4" /><span>{slot.details?.client_name}</span></div>
-            <div className="flex items-center gap-2 text-muted-foreground"><Scissors className="h-4 w-4" /><span>{slot.details?.service_name}</span></div>
+            <div className="flex items-center gap-2 text-muted-foreground"><User className="h-4 w-4" /><span>{slot.details?.client_name || 'Cliente Desconhecido'}</span></div>
+            <div className="flex items-center gap-2 text-muted-foreground"><Scissors className="h-4 w-4" /><span>{slot.details?.service_name || 'Serviço Desconhecido'}</span></div>
           </div>
         );
       case 'blocked':
@@ -171,7 +171,7 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
             ))}
           </div>
         ) : (
-          <p className="text-center text-muted-foreground py-8">Nenhuma disponibilidade cadastrada para esta data.</p>
+          <p className="text-center text-muted-foreground py-8">Nenhum horário disponível para esta data.</p>
         )}
       </CardContent>
     </Card>
