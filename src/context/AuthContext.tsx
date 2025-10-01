@@ -12,9 +12,8 @@ interface Profile {
 interface AuthContextType {
   currentUser: User | null;
   profile: Profile | null;
-  login: (email, password) => Promise<void>;
+  login: (phone, password) => Promise<void>;
   logout: () => Promise<void>;
-  register: (name, email, phone, password) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,8 +58,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const login = async (phone, password) => {
+    const { error } = await supabase.auth.signInWithPassword({ phone, password });
     if (error) {
       showError(error.message);
     } else {
@@ -73,31 +72,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await supabase.auth.signOut();
     navigate('/login');
   };
-  
-  const register = async (name, email, phone, password) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: name,
-        }
-      }
-    });
-    if (error) {
-      showError(error.message);
-    } else {
-      showSuccess("Cadastro realizado com sucesso! Faça o login.");
-      navigate('/login');
-    }
-  };
 
   const value = {
     currentUser,
     profile,
     login,
     logout,
-    register,
   };
 
   return (

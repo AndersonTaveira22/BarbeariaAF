@@ -13,13 +13,15 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await login(email, password);
+    // Adicionar o código do país (Brasil)
+    const fullPhone = `+55${phone.replace(/\D/g, '')}`;
+    await login(fullPhone, password);
   };
 
   return (
@@ -28,32 +30,26 @@ const Login = () => {
         <CardHeader>
           <CardTitle className="text-3xl font-serif">Login</CardTitle>
           <CardDescription>
-            Entre com seu e-mail para acessar sua conta
+            Entre com seu celular para acessar sua conta
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="email">E-mail</Label>
+                <Label htmlFor="phone">Celular (com DDD)</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
+                  id="phone"
+                  type="tel"
+                  placeholder="21999998888"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                 />
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center">
                   <Label htmlFor="password">Senha</Label>
-                  <Link
-                    to="#"
-                    className="ml-auto inline-block text-sm text-primary hover:underline"
-                  >
-                    Esqueceu sua senha?
-                  </Link>
                 </div>
                 <Input
                   id="password"

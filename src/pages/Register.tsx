@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -10,77 +10,119 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth } from '@/context/AuthContext';
-import { showError } from '@/utils/toast';
+import { supabase } from '@/integrations/supabase/client';
+import { showError, showSuccess } from '@/utils/toast';
 
 const Register = () => {
+  const [step, setStep] = useState('enterPhone'); // 'enterPhone' or 'enterCode'
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const { register } = useAuth();
+  const [verificationCode, setVerificationCode] = useState('');
+  const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirmPassword) {
-      showError('As senhas não coincidem.');
-      return;
+    const fullPhone = `+55${phone.replace(/\D/g, '')}`;
+    
+    const { error } = await supabase.auth.signUp({
+      phone: fullPhone,
+      password,
+      options: {
+        data: {
+          full_name: name,
+        },
+      },
+    });
+
+    if (error) {
+      showError(error.message);
+    } else {
+      showSuccess('Código de verificação enviado por SMS!');
+      setStep('enterCode');
     }
-    await register(name, email, phone, password);
+  };
+
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const fullPhone = `+55${phone.replace(/\D/g, '')}`;
+
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone: fullPhone,
+      token: verificationCode,
+      type: 'sms',
+    });
+
+    if (error) {
+      showError(error.message);
+    } else {
+      showSuccess('Conta criada com sucesso!');
+      navigate('/');
+    }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <Card className="mx-auto max-w-sm border-border">
-        <CardHeader>
-          <CardTitle className="text-3xl font-serif">Cadastro</CardTitle>
-          <CardDescription>
-            Crie sua conta para agendar seu horário
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="full-name">Nome Completo</Label>
-                <Input id="full-name" placeholder="Seu Nome" required value={name} onChange={(e) => setName(e.target.value)} />
+        {step === 'enterPhone' ? (
+          <>
+            <CardHeader>
+              <CardTitle className="text-3xl font-serif">Cadastro</CardTitle>
+              <CardDescription>
+                Crie sua conta para agendar seu horário
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSendCode}>
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="full-name">Nome Completo</Label>
+                    <Input id="full-name" placeholder="Seu Nome" required value={name} onChange={(e) => setName(e.target.value)} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="phone">Celular (com DDD)</Label>
+                    <Input id="phone" type="tel" placeholder="21999998888" required value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="password">Senha</Label>
+                    <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                  </div>
+                  <Button type="submit" className="w-full">
+                    Enviar Código
+                  </Button>
+                </div>
+              </form>
+              <div className="mt-4 text-center text-sm">
+                Já tem uma conta?{' '}
+                <Link to="/login" className="underline text-primary">
+                  Login
+                </Link>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="email">E-mail</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-               <div className="grid gap-2">
-                <Label htmlFor="phone">Celular</Label>
-                <Input id="phone" placeholder="(XX) XXXXX-XXXX" required value={phone} onChange={(e) => setPhone(e.target.value)} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="password">Senha</Label>
-                <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-              </div>
-               <div className="grid gap-2">
-                <Label htmlFor="confirm-password">Confirmar Senha</Label>
-                <Input id="confirm-password" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-              </div>
-              <Button type="submit" className="w-full">
-                Criar conta
-              </Button>
-            </div>
-          </form>
-          <div className="mt-4 text-center text-sm">
-            Já tem uma conta?{' '}
-            <Link to="/login" className="underline text-primary">
-              Login
-            </Link>
-          </div>
-        </CardContent>
+            </CardContent>
+          </>
+        ) : (
+          <>
+            <CardHeader>
+              <CardTitle className="text-3xl font-serif">Verificar Código</CardTitle>
+              <CardDescription>
+                Digite o código que enviamos para o seu celular.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleVerifyCode}>
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="code">Código de Verificação</Label>
+                    <Input id="code" placeholder="123456" required value={verificationCode} onChange={(e) => setVerificationCode(e.target.value)} />
+                  </div>
+                  <Button type="submit" className="w-full">
+                    Verificar e Criar Conta
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </>
+        )}
       </Card>
     </div>
   );
