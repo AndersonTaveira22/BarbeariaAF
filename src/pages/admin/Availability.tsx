@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { showSuccess, showError } from '@/utils/toast';
 import BackButton from '@/components/BackButton';
-import { format, startOfDay, endOfDay, add, set } from 'date-fns'; // Import 'set'
+import { format, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface Availability {
@@ -24,8 +24,6 @@ const AvailabilityPage = () => {
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('18:00');
-  const [breakStartTime, setBreakStartTime] = useState('');
-  const [breakEndTime, setBreakEndTime] = useState('');
 
   const fetchAvailabilities = async () => {
     if (!currentUser) return;
@@ -55,8 +53,6 @@ const AvailabilityPage = () => {
         setStartTime('09:00');
         setEndTime('18:00');
       }
-      setBreakStartTime('');
-      setBreakEndTime('');
     }
   }, [selectedDate, availabilities]);
 
@@ -65,7 +61,7 @@ const AvailabilityPage = () => {
 
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
 
-    // 1. Upsert the main availability for the day
+    // Apenas salva a disponibilidade principal do dia
     const { error: availabilityError } = await supabase.from('barber_availability').upsert({
       barber_id: currentUser.id,
       date: formattedDate,
@@ -76,51 +72,6 @@ const AvailabilityPage = () => {
     if (availabilityError) {
       showError('Erro ao salvar horário: ' + availabilityError.message);
       return;
-    }
-
-    // 2. Clear any previously defined break slots for this day
-    const dayStart = startOfDay(selectedDate).toISOString();
-    const dayEnd = endOfDay(selectedDate).toISOString();
-    const { error: deleteError } = await supabase
-      .from('blocked_slots')
-      .delete()
-      .eq('barber_id', currentUser.id)
-      .gte('start_time', dayStart)
-      .lte('start_time', dayEnd);
-
-    if (deleteError) {
-        showError('Erro ao limpar intervalos antigos: ' + deleteError.message);
-        return;
-    }
-
-    // 3. If new break times are provided, create the new blocked slots
-    if (breakStartTime && breakEndTime) {
-      const breakSlots = [];
-      const slotDuration = 45;
-      
-      let currentTime = new Date(`${formattedDate}T${breakStartTime}`);
-      currentTime = set(currentTime, { milliseconds: 0 }); // Normalize milliseconds
-      
-      const breakEnd = new Date(`${formattedDate}T${breakEndTime}`);
-      const normalizedBreakEnd = set(breakEnd, { milliseconds: 0 }); // Normalize milliseconds for comparison
-
-      while (currentTime < normalizedBreakEnd) {
-        breakSlots.push({
-          barber_id: currentUser.id,
-          start_time: currentTime.toISOString(),
-          end_time: add(currentTime, { minutes: slotDuration }).toISOString(),
-        });
-        currentTime = add(currentTime, { minutes: slotDuration });
-        currentTime = set(currentTime, { milliseconds: 0 }); // Normalize after adding minutes
-      }
-
-      if (breakSlots.length > 0) {
-        const { error: blockError } = await supabase.from('blocked_slots').insert(breakSlots);
-        if (blockError) {
-          showError('Erro ao bloquear horários de intervalo: ' + blockError.message);
-          return;
-        }
-      }
     }
 
     showSuccess('Disponibilidade salva com sucesso!');
@@ -155,7 +106,7 @@ const AvailabilityPage = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-3xl font-serif">Gerenciar Disponibilidade</CardTitle>
-            <CardDescription>Selecione um dia, defina seus horários de trabalho e adicione um intervalo se necessário.</CardDescription>
+            <CardDescription>Selecione um dia no calendário e defina seus horários de trabalho.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="flex justify-center">
@@ -182,17 +133,6 @@ const AvailabilityPage = () => {
                 <div className="grid gap-2 mt-2">
                   <Label htmlFor="end-time">Fim do Expediente</Label>
                   <Input id="end-time" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
-                </div>
-              </div>
-              <div className="border-t pt-4">
-                 <h4 className="text-lg font-serif text-center mb-4">Adicionar Intervalo (Opcional)</h4>
-                 <div className="grid gap-2">
-                  <Label htmlFor="break-start-time">Início do Intervalo</Label>
-                  <Input id="break-start-time" type="time" value={breakStartTime} onChange={e => setBreakStartTime(e.target.value)} />
-                </div>
-                <div className="grid gap-2 mt-2">
-                  <Label htmlFor="break-end-time">Fim do Intervalo</Label>
-                  <Input id="break-end-time" type="time" value={breakEndTime} onChange={e => setBreakEndTime(e.target.value)} />
                 </div>
               </div>
               <div className="flex gap-2 pt-4">
