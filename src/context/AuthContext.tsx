@@ -25,16 +25,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Helper function to fetch or create profile
+  const fetchOrCreateProfile = async (user: User) => {
+    let { data: userProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError && profileError.code === 'PGRST116') { // No rows found
+      // Profile does not exist, create a basic one
+      const { data: newProfile, error: insertError } = await supabase
+        .from('profiles')
+        .insert({ id: user.id, full_name: user.email?.split('@')[0] || 'Usuário Novo', role: 'cliente' })
+        .select()
+        .single();
+
+      if (insertError) {
+        showError('Erro ao criar perfil básico: ' + insertError.message);
+        return null;
+      }
+      showSuccess('Perfil criado automaticamente.');
+      return newProfile;
+    } else if (profileError) {
+      showError('Erro ao carregar perfil: ' + profileError.message);
+      return null;
+    }
+    return userProfile;
+  };
+
   useEffect(() => {
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         setCurrentUser(session.user);
-        const { data: userProfile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        const userProfile = await fetchOrCreateProfile(session.user);
         setProfile(userProfile);
       }
       setLoading(false);
@@ -45,11 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setCurrentUser(session?.user ?? null);
       if (session?.user) {
-        const { data: userProfile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        const userProfile = await fetchOrCreateProfile(session.user);
         setProfile(userProfile);
       } else {
         setProfile(null);
@@ -64,20 +85,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) {
       showError(error.message);
     } else if (data.user) {
-      const { data: userProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
+      const userProfile = await fetchOrCreateProfile(data.user);
 
-      if (profileError) {
-        showError('Não foi possível carregar os dados do perfil.');
-        await supabase.auth.signOut();
-      } else {
+      if (userProfile) {
         setProfile(userProfile);
         setCurrentUser(data.user);
         showSuccess('Login realizado com sucesso!');
         navigate('/');
+      } else {
+        // If profile creation/fetch failed, log out the user
+        showError('Não foi possível carregar ou criar os dados do perfil. Por favor, tente novamente.');
+        await supabase.auth.signOut();
       }
     }
   };
