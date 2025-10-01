@@ -29,8 +29,13 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
   const [loading, setLoading] = useState(true);
 
   const fetchSchedule = useCallback(async () => {
-    if (!currentUser || !selectedDate) return;
+    if (!currentUser || !selectedDate) {
+      console.log("DailySchedule: currentUser ou selectedDate não definidos.");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    console.log("DailySchedule: Buscando agenda para", selectedDate);
 
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const start = startOfDay(selectedDate).toISOString();
@@ -43,14 +48,19 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     ]);
 
     const { data: availability, error: availabilityError } = availabilityRes;
+    console.log("DailySchedule: Availability data:", availability, "error:", availabilityError);
     if (availabilityError || !availability) {
+      console.log("DailySchedule: Nenhuma disponibilidade encontrada ou erro na busca.");
       setSlots([]);
       setLoading(false);
       return;
     }
 
-    const { data: appointments } = appointmentsRes;
-    const { data: blockedSlots } = blockedSlotsRes;
+    const { data: appointments, error: appointmentsError } = appointmentsRes;
+    console.log("DailySchedule: Appointments data:", appointments, "error:", appointmentsError);
+
+    const { data: blockedSlots, error: blockedSlotsError } = blockedSlotsRes;
+    console.log("DailySchedule: Blocked Slots data:", blockedSlots, "error:", blockedSlotsError);
 
     const toLocalTimeForComparison = (utcIsoString: string, targetDate: Date) => {
       const utcDate = new Date(utcIsoString);
@@ -66,11 +76,14 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       time: toLocalTimeForComparison(a.appointment_time, selectedDate).getTime(),
       details: { id: a.id, client_name: (a.profiles as any)?.full_name, service_name: (a.services as any)?.name }
     })) || [];
+    console.log("DailySchedule: Processed bookedTimes:", bookedTimes);
+
 
     const blockedTimes = blockedSlots?.map(b => ({
       time: toLocalTimeForComparison(b.start_time, selectedDate).getTime(),
       details: { id: b.id }
     })) || [];
+    console.log("DailySchedule: Processed blockedTimes:", blockedTimes);
     
     const allSlots: Slot[] = [];
     const slotDuration = 45;
@@ -91,13 +104,13 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       } else if (blockedSlot) {
         allSlots.push({ time: new Date(currentTime), status: 'blocked', details: blockedSlot.details });
       }
-      // Horários 'available' não são mais adicionados à lista
       currentTime = add(currentTime, { minutes: slotDuration });
       currentTime = set(currentTime, { milliseconds: 0 });
     }
 
     setSlots(allSlots);
     setLoading(false);
+    console.log("DailySchedule: Final slots to display:", allSlots);
   }, [selectedDate, currentUser]);
 
   useEffect(() => {
@@ -141,8 +154,7 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       case 'blocked':
         return <div className="flex-1 flex items-center gap-2 text-destructive"><Lock className="h-4 w-4" /><span>Horário Bloqueado</span></div>;
       default:
-        // Este caso não deve ser alcançado se os slots 'available' forem filtrados
-        return null;
+        return null; // Não exibe slots 'available'
     }
   };
 
@@ -162,7 +174,6 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
                   <p className="text-lg font-bold">{format(slot.time, 'HH:mm')}</p>
                 </div>
                 {renderSlot(slot)}
-                {/* O botão de bloquear só aparecerá se você quiser reintroduzir a opção de bloquear horários disponíveis */}
                 {slot.status === 'blocked' && <Button variant="secondary" size="sm" onClick={() => handleUnblock(slot.details!.id)}><Unlock className="mr-2 h-4 w-4" />Desbloquear</Button>}
               </div>
             ))}
