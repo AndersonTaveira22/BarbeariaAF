@@ -69,7 +69,7 @@ const DateTimePicker = ({ barber, onDateTimeSelect }: DateTimePickerProps) => {
       const [startHour, startMinute] = availability.start_time.split(':').map(Number);
       const [endHour, endMinute] = availability.end_time.split(':').map(Number);
       
-      const slotDuration = 60; // Duração de 1 hora por serviço
+      const slotDuration = 45; // Duração de 45 minutos por serviço
 
       let currentTime = setMinutes(setHours(startOfDay(date), startHour), startMinute);
       const endTime = setMinutes(setHours(startOfDay(date), endHour), endMinute);
