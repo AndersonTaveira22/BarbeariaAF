@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { showSuccess, showError } from '@/utils/toast';
 import BackButton from '@/components/BackButton';
-import { format, startOfDay, add } from 'date-fns';
+import { format, startOfDay, endOfDay, add } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface Availability {
@@ -55,7 +55,6 @@ const AvailabilityPage = () => {
         setStartTime('09:00');
         setEndTime('18:00');
       }
-      // Reset break times when changing date
       setBreakStartTime('');
       setBreakEndTime('');
     }
@@ -66,7 +65,7 @@ const AvailabilityPage = () => {
 
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
 
-    // 1. Save the main availability
+    // 1. Upsert the main availability for the day
     const { error: availabilityError } = await supabase.from('barber_availability').upsert({
       barber_id: currentUser.id,
       date: formattedDate,
@@ -79,7 +78,22 @@ const AvailabilityPage = () => {
       return;
     }
 
-    // 2. If break times are provided, create blocked slots
+    // 2. Clear any previously defined break slots for this day
+    const dayStart = startOfDay(selectedDate).toISOString();
+    const dayEnd = endOfDay(selectedDate).toISOString();
+    const { error: deleteError } = await supabase
+      .from('blocked_slots')
+      .delete()
+      .eq('barber_id', currentUser.id)
+      .gte('start_time', dayStart)
+      .lte('start_time', dayEnd);
+
+    if (deleteError) {
+        showError('Erro ao limpar intervalos antigos: ' + deleteError.message);
+        return;
+    }
+
+    // 3. If new break times are provided, create the new blocked slots
     if (breakStartTime && breakEndTime) {
       const breakSlots = [];
       const slotDuration = 45;
