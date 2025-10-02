@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { add, format, startOfDay, endOfDay, set } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { ptBR } from 'date-fns/locale'; // Corrigido: removido o '='
 import { Clock, User, Scissors, Lock, Unlock } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 
@@ -39,8 +39,7 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     const start = startOfDay(selectedDate).toISOString();
     const end = endOfDay(selectedDate).toISOString();
 
-    // MODIFICAÇÃO CRÍTICA: Buscar disponibilidade diária diretamente com .single()
-    // Isso garante que a lógica de busca seja idêntica ao AvailabilitySlotsManager, que está funcionando.
+    // Buscar disponibilidade diária diretamente com .single()
     const { data: availability, error: availabilityError } = await supabase
       .from('barber_availability')
       .select('start_time, end_time')
@@ -50,7 +49,8 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
 
     // Se não houver disponibilidade diária definida para a data, mostre um erro e pare.
     if (availabilityError || !availability) {
-      showError('Disponibilidade diária não definida para esta data. Por favor, defina em "Gerenciar Disponibilidade".');
+      // MENSAGEM DE ERRO MAIS DETALHADA
+      showError(`Disponibilidade diária não definida para ${dateStr} (Barbeiro ID: ${currentUser.id}). Por favor, defina em "Gerenciar Disponibilidade".`);
       setSlots([]);
       setLoading(false);
       return;
