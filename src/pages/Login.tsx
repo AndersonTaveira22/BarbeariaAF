@@ -24,16 +24,20 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Card className="mx-auto max-w-sm border-border">
-        <CardHeader>
-          <CardTitle className="text-3xl font-serif">Login</CardTitle>
-          <CardDescription>
-            Entre com seu email para acessar sua conta
+    <div
+      className="min-h-screen flex items-center justify-center bg-cover bg-center p-4"
+      style={{ backgroundImage: "url('/photo.jpg')" }}
+    >
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+      <Card className="mx-auto max-w-sm w-full border-border relative z-10 bg-card/90 shadow-2xl rounded-xl">
+        <CardHeader className="text-center">
+          <CardTitle className="text-4xl font-serif text-primary">Bem-vindo de volta</CardTitle>
+          <CardDescription className="text-muted-foreground">
+            Entre com seu email e senha para acessar sua conta
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -43,6 +47,7 @@ const Login = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="bg-background/50 border-input focus:border-primary"
               />
             </div>
             <div className="grid gap-2">
@@ -55,24 +60,25 @@ const Login = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className="bg-background/50 border-input focus:border-primary"
               />
             </div>
             <div className="flex items-center space-x-2">
-              <Checkbox id="remember-me" defaultChecked />
+              <Checkbox id="remember-me" defaultChecked className="border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground" />
               <Label
                 htmlFor="remember-me"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                className="text-sm font-medium leading-none text-muted-foreground"
               >
                 Manter conectado
               </Label>
             </div>
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full text-lg py-6 font-semibold bg-primary hover:bg-primary/90 text-primary-foreground">
               Login
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-6 text-center text-sm text-muted-foreground">
             Não tem uma conta?{' '}
-            <Link to="/register" className="underline text-primary">
+            <Link to="/register" className="underline text-primary hover:text-primary/80 font-medium">
               Cadastre-se
             </Link>
           </div>
