@@ -8,6 +8,7 @@ interface Profile {
   full_name: string;
   role: 'cliente' | 'admin';
   avatar_url: string;
+  phone_number?: string; // Adicionado phone_number
 }
 
 interface AuthContextType {

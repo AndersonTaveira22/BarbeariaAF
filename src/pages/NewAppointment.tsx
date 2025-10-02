@@ -47,9 +47,12 @@ const NewAppointment = () => {
       return;
     }
 
-    // Preenche o nome do cliente automaticamente se o perfil estiver disponível
+    // Preenche o nome e telefone do cliente automaticamente se o perfil estiver disponível
     if (profile?.full_name) {
       setClientName(profile.full_name);
+    }
+    if (profile?.phone_number) { // Preenche o telefone automaticamente
+      setClientPhone(profile.phone_number);
     }
 
     const fetchServices = async () => {

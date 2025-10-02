@@ -17,6 +17,7 @@ const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState(''); // Novo estado para o telefone
   const navigate = useNavigate();
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -28,6 +29,7 @@ const Register = () => {
       options: {
         data: {
           full_name: name,
+          phone_number: phone, // Enviando o número de telefone
         },
       },
     });
@@ -59,6 +61,10 @@ const Register = () => {
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" placeholder="seu@email.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="phone">Telefone</Label> {/* Novo campo de telefone */}
+                <Input id="phone" type="tel" placeholder="(XX) XXXXX-XXXX" required value={phone} onChange={(e) => setPhone(e.target.value)} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="password">Senha</Label>
