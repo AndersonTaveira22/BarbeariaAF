@@ -95,44 +95,75 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    console.log("AuthContext: useEffect iniciado.");
-    // onAuthStateChange irá lidar com o estado inicial da sessão (INITIAL_SESSION)
+    console.log("AuthContext: useEffect iniciado. Setting loading to true.");
+    setLoading(true); // Garante que loading seja true no início do efeito
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log("AuthContext: onAuthStateChange event:", _event, "session:", session?.user?.id);
-      
-      try {
-        if (session?.user) {
-          setCurrentUser(session.user);
-          const userProfile = await fetchOrCreateProfile(session.user);
-          if (userProfile) {
-            setProfile(userProfile);
+    let authSubscription: { unsubscribe: () => void } | null = null;
+    let globalTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const setupAuthListener = async () => {
+      // Define um tempo limite global para garantir que 'loading' seja false
+      globalTimeoutId = setTimeout(() => {
+        console.warn("AuthContext: Inicialização da autenticação excedeu o tempo limite (10s). Forçando loading para false.");
+        setLoading(false);
+        showError("Tempo limite excedido ao carregar autenticação. Por favor, tente novamente.");
+        // Opcional: Forçar logout aqui se um tempo limite implica um estado corrompido
+        supabase.auth.signOut();
+        setCurrentUser(null);
+        setProfile(null);
+      }, 10000); // 10 segundos de tempo limite
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => { // Corrigido aqui
+        console.log("AuthContext: onAuthStateChange event:", _event, "session:", session?.user?.id);
+        
+        // Limpa o tempo limite global se o onAuthStateChange for disparado
+        if (globalTimeoutId) {
+          clearTimeout(globalTimeoutId);
+          globalTimeoutId = null;
+        }
+
+        try {
+          if (session?.user) {
+            setCurrentUser(session.user);
+            const userProfile = await fetchOrCreateProfile(session.user);
+            if (userProfile) {
+              setProfile(userProfile);
+            } else {
+              console.error("AuthContext: Falha ao carregar/criar perfil. Forçando logout.");
+              showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
+              await supabase.auth.signOut();
+              setCurrentUser(null);
+              setProfile(null);
+            }
           } else {
-            // Se o perfil não pôde ser carregado/criado (incluindo por tempo limite), a sessão pode estar em um estado ruim.
-            // Forçamos o logout para limpar e permitir um novo login.
-            console.error("AuthContext: Falha ao carregar/criar perfil. Forçando logout.");
-            showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
-            await supabase.auth.signOut();
             setCurrentUser(null);
             setProfile(null);
           }
-        } else {
+        } catch (e) {
+          console.error("AuthContext: Erro inesperado no onAuthStateChange:", e);
+          showError("Erro inesperado na autenticação. Por favor, tente novamente.");
           setCurrentUser(null);
           setProfile(null);
+          await supabase.auth.signOut();
+        } finally {
+          setLoading(false); // Garante que loading seja definido como false aqui
+          console.log("AuthContext: onAuthStateChange process finished, loading set to false.");
         }
-      } catch (e) {
-        console.error("AuthContext: Erro inesperado no onAuthStateChange:", e);
-        showError("Erro inesperado na autenticação. Por favor, tente novamente.");
-        setCurrentUser(null);
-        setProfile(null);
-        await supabase.auth.signOut();
-      } finally {
-        setLoading(false); // Garante que loading seja definido como false aqui
-        console.log("AuthContext: onAuthStateChange process finished, loading set to false.");
-      }
-    });
+      });
+      authSubscription = subscription; // Atribui a subscription corretamente
+    };
 
-    return () => subscription.unsubscribe();
+    setupAuthListener();
+
+    return () => {
+      console.log("AuthContext: useEffect cleanup.");
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
+      if (globalTimeoutId) {
+        clearTimeout(globalTimeoutId);
+      }
+    };
   }, []); // Array de dependências vazio para rodar apenas uma vez na montagem
 
   const login = async (email, password) => {
