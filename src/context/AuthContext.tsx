@@ -30,26 +30,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchOrCreateProfile = async (user: User) => {
     console.log("AuthContext: fetchOrCreateProfile chamado para o usuário:", user.id);
     try {
-      console.log("AuthContext: PRE-QUERY - Tentando consultar perfil no Supabase para ID:", user.id); // NOVO LOG AQUI
+      console.log("AuthContext: PRE-QUERY - Tentando consultar perfil no Supabase para ID:", user.id);
       let { data: userProfileArray, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, role, avatar_url, phone_number') // Selecionando colunas explicitamente
-        .eq('id', user.id); // Removendo .single() para teste
+        .select('id') // SIMPLIFICADO PARA APENAS 'id' para depuração
+        .eq('id', user.id);
 
-      console.log("AuthContext: POST-QUERY - Consulta de perfil Supabase concluída."); // NOVO LOG AQUI
-
+      console.log("AuthContext: AFTER AWAIT - Consulta de perfil Supabase concluída."); // NOVO LOG AQUI
+      
       // Se .single() foi removido, data será um array. Precisamos pegar o primeiro elemento.
       const userProfile = userProfileArray && userProfileArray.length > 0 ? userProfileArray[0] : null;
 
       console.log("AuthContext: Resultado da consulta de perfil Supabase:", userProfile, "Erro:", profileError);
 
-      if (profileError) { // Se houver erro, mesmo que não seja PGRST116
+      if (profileError) {
         console.error("AuthContext: Erro ao carregar perfil:", profileError);
         showError('Erro ao carregar perfil: ' + profileError.message);
         return null;
       }
       
-      if (!userProfile) { // Se nenhum perfil foi encontrado
+      if (!userProfile) {
         console.log("AuthContext: Perfil não encontrado, criando um novo.");
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
@@ -66,8 +66,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return newProfile;
       }
       
-      console.log("AuthContext: Perfil carregado:", userProfile);
-      return userProfile;
+      // Se o perfil foi encontrado com apenas 'id', precisamos buscar os outros dados
+      // Isso é um passo de diagnóstico. Se a consulta acima funcionar, esta segunda consulta
+      // nos dirá se o problema está nas outras colunas ou RLS.
+      const { data: fullProfile, error: fullProfileError } = await supabase
+        .from('profiles')
+        .select('id, full_name, role, avatar_url, phone_number')
+        .eq('id', user.id)
+        .single();
+
+      if (fullProfileError) {
+        console.error("AuthContext: Erro ao carregar perfil completo após ID:", fullProfileError);
+        showError('Erro ao carregar perfil completo: ' + fullProfileError.message);
+        return null;
+      }
+
+      console.log("AuthContext: Perfil carregado:", fullProfile);
+      return fullProfile;
+
     } catch (e) {
       console.error("AuthContext: Erro inesperado em fetchOrCreateProfile:", e);
       showError("Erro inesperado ao buscar/criar perfil.");
