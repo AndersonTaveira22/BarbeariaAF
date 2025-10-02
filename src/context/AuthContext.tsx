@@ -21,9 +21,9 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(undefined); // undefined para indicar 'ainda não verificado'
+  const [currentUser, setCurrentUser] = useState<User | null>(null); // Inicializado como null
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true); // Começa como true para indicar carregamento
+  const [loading, setLoading] = useState(true); // Começa como true
   const navigate = useNavigate();
 
   // Helper function to fetch or create profile
@@ -59,53 +59,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    const getSession = async () => {
-      console.log("AuthContext: Iniciando verificação de sessão...");
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error("AuthContext: Erro ao obter sessão:", error);
-          showError("Erro ao carregar sessão: " + error.message);
-          setCurrentUser(null);
-          setProfile(null);
-        } else if (session) {
-          console.log("AuthContext: Sessão encontrada:", session.user.id);
-          setCurrentUser(session.user);
-          const userProfile = await fetchOrCreateProfile(session.user);
-          setProfile(userProfile);
-        } else {
-          console.log("AuthContext: Nenhuma sessão ativa.");
-          setCurrentUser(null);
-          setProfile(null);
-        }
-      } catch (e) {
-        console.error("AuthContext: Erro inesperado em getSession:", e);
-        showError("Erro inesperado ao carregar sessão.");
-        setCurrentUser(null);
-        setProfile(null);
-      } finally {
-        setLoading(false); // Garante que o estado de carregamento seja sempre finalizado
-        console.log("AuthContext: Verificação de sessão finalizada.");
-      }
-    };
-
-    getSession();
+    setLoading(true); // Garante que o estado de carregamento seja true ao iniciar o listener
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log("AuthContext: onAuthStateChange event:", _event, "session:", session?.user?.id);
-      setCurrentUser(session?.user ?? null);
+      
       if (session?.user) {
+        setCurrentUser(session.user);
         const userProfile = await fetchOrCreateProfile(session.user);
         setProfile(userProfile);
       } else {
+        setCurrentUser(null);
         setProfile(null);
       }
-      // O setLoading(false) é apenas para o carregamento inicial, não para mudanças de estado subsequentes.
+      setLoading(false); // Define loading como false APÓS processar o estado de autenticação
+      console.log("AuthContext: onAuthStateChange process finished, loading set to false.");
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, []); // O array de dependências vazio garante que o useEffect rode apenas uma vez na montagem
 
   const login = async (email, password) => {
     console.log("AuthContext: Tentando login para:", email);
