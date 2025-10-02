@@ -54,6 +54,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (result === null) { // Tempo limite ocorreu
         console.error("AuthContext: fetchOrCreateProfile retornou null devido a tempo limite.");
+        // Força logout e navegação para login se o perfil exceder o tempo limite
+        await supabase.auth.signOut();
+        showError('Não foi possível carregar os dados do perfil devido a tempo limite. Por favor, faça login novamente.');
+        setLoading(false); // Garante que loading seja false antes de navegar
+        navigate('/login');
         return null;
       }
 
@@ -66,12 +71,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if ('code' in profileError && (profileError as any).code !== 'PGRST116') { 
           console.error("AuthContext: Erro ao carregar perfil (fetchOrCreateProfile):", profileError);
           showError('Erro ao carregar perfil: ' + profileError.message);
+          await supabase.auth.signOut(); // Força logout em caso de erro no perfil
+          setLoading(false);
+          navigate('/login');
           return null;
         } else if ('code' in profileError && (profileError as any).code === 'PGRST116') {
           console.log("AuthContext: Perfil não encontrado (PGRST116), tentando criar um novo.");
         } else {
           console.error("AuthContext: Erro inesperado ao carregar perfil (sem código PGRST116):", profileError);
           showError('Erro inesperado ao carregar perfil: ' + profileError.message);
+          await supabase.auth.signOut(); // Força logout em caso de erro inesperado
+          setLoading(false);
+          navigate('/login');
           return null;
         }
       }
@@ -87,6 +98,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (insertError) {
           console.error("AuthContext: Erro ao criar perfil básico:", insertError);
           showError('Erro ao criar perfil básico: ' + insertError.message);
+          await supabase.auth.signOut(); // Força logout em caso de erro na criação do perfil
+          setLoading(false);
+          navigate('/login');
           return null;
         }
         showSuccess('Perfil criado automaticamente.');
@@ -99,6 +113,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (e) {
       console.error("AuthContext: Erro inesperado em fetchOrCreateProfile:", e);
       showError("Erro inesperado ao buscar/criar perfil.");
+      await supabase.auth.signOut(); // Força logout em caso de erro inesperado
+      setLoading(false);
+      navigate('/login');
       return null;
     }
   };
@@ -124,10 +141,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.warn("AuthContext: Inicialização da autenticação excedeu o tempo limite (10s). Forçando loading para false e logout.");
       setLoading(false);
       showError("Tempo limite excedido ao carregar autenticação. Por favor, faça login novamente.");
-      // Força logout para limpar a sessão, mas não navega aqui.
+      // Força logout e navegação para login
       supabase.auth.signOut().then(() => {
           setCurrentUser(null);
           setProfile(null);
+          navigate('/login'); // Navega para login após timeout global
       });
     }, 10000); // 10 segundos de tempo limite
 
@@ -144,19 +162,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           setCurrentUser(session.user);
           const userProfile = await fetchOrCreateProfile(session.user);
-          if (userProfile) {
-            setProfile(userProfile);
-          } else {
-            // Se o perfil não pôde ser carregado/criado (incluindo por tempo limite), a sessão pode estar em um estado ruim.
-            console.error("AuthContext: Falha ao carregar/criar perfil. Forçando logout.");
-            showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
-            await supabase.auth.signOut();
+          if (!userProfile) {
+            // Se userProfile for null, a navegação para /login já foi tratada dentro de fetchOrCreateProfile
+            // ou um erro foi exibido. Apenas garantimos que o estado seja limpo.
             setCurrentUser(null);
             setProfile(null);
+          } else {
+            setProfile(userProfile);
           }
         } else {
           setCurrentUser(null);
           setProfile(null);
+          // Se não há sessão, e não estamos em uma página de autenticação, navega para login
+          const currentPath = window.location.pathname;
+          if (!['/login', '/register', '/forgot-password', '/update-password'].includes(currentPath)) {
+              setLoading(false); // Garante que loading seja false antes de navegar
+              navigate('/login');
+          }
         }
       } catch (e) {
         console.error("AuthContext: Erro inesperado no onAuthStateChange:", e);
@@ -164,6 +186,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setCurrentUser(null);
         setProfile(null);
         await supabase.auth.signOut();
+        setLoading(false); // Garante que loading seja false antes de navegar
+        navigate('/login');
       } finally {
         setLoading(false); // Garante que loading seja definido como false aqui
         console.log("AuthContext: onAuthStateChange process finished, loading set to false.");
