@@ -27,6 +27,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate(); // Mantemos navigate para uso em login/logout
+  const [shouldRenderChildren, setShouldRenderChildren] = useState(false); // Novo estado para controlar a renderização dos children
 
   // Helper function to fetch or create profile
   const fetchOrCreateProfile = async (user: User) => {
@@ -116,6 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     console.log("AuthContext: useEffect iniciado. Setting loading to true.");
     setLoading(true); // Garante que loading seja true no início do efeito
+    setShouldRenderChildren(false); // Reseta o estado de renderização dos children
 
     let globalTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -153,12 +155,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await supabase.auth.signOut();
             setCurrentUser(null);
             setProfile(null);
-            // REMOVIDO: navigate('/login'); - A navegação será gerenciada pelo App.tsx
           }
         } else {
           setCurrentUser(null);
           setProfile(null);
-          // REMOVIDO: Lógica de navegação para /login aqui. Será gerenciada pelo App.tsx
         }
       } catch (e) {
         console.error("AuthContext: Erro inesperado no onAuthStateChange:", e);
@@ -166,7 +166,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setCurrentUser(null);
         setProfile(null);
         await supabase.auth.signOut();
-        // REMOVIDO: navigate('/login'); - A navegação será gerenciada pelo App.tsx
       } finally {
         setLoading(false); // Garante que loading seja definido como false aqui
         console.log("AuthContext: onAuthStateChange process finished, loading set to false.");
@@ -181,6 +180,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
   }, []); // Array de dependências vazio para rodar apenas uma vez na montagem
+
+  // Efeito para controlar a renderização dos children após o carregamento
+  useEffect(() => {
+    if (!loading) {
+      // Se não está mais carregando, permite a renderização dos children após um pequeno atraso
+      // Isso dá tempo para o AppContent processar a navegação se o usuário não estiver logado
+      const timer = setTimeout(() => {
+        setShouldRenderChildren(true);
+      }, 100); // Pequeno atraso de 100ms
+      return () => clearTimeout(timer);
+    } else {
+      setShouldRenderChildren(false); // Se estiver carregando, não renderiza os children
+    }
+  }, [loading]);
+
 
   const login = async (email, password) => {
     console.log("AuthContext: Tentando login para:", email);
@@ -208,7 +222,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {children} {/* Sempre renderiza os children, o App.tsx decidirá o que mostrar */}
+      {loading || !shouldRenderChildren ? ( // Mostra tela de carregamento se ainda estiver carregando ou se os children não devem ser renderizados ainda
+        <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+          <p className="text-lg">Carregando autenticação...</p>
+        </div>
+      ) : (
+        children // Renderiza os children apenas quando shouldRenderChildren for true
+      )}
     </AuthContext.Provider>
   );
 };
