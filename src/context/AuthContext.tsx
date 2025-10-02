@@ -31,10 +31,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchOrCreateProfile = async (user: User) => {
     console.log("AuthContext: fetchOrCreateProfile chamado para o usuário:", user.id);
     try {
+      console.log("AuthContext: Tentando consultar perfil no Supabase para ID:", user.id);
       let { data: userProfileArray, error: profileError } = await supabase
         .from('profiles')
         .select('id, full_name, role, avatar_url, phone_number')
         .eq('id', user.id);
+
+      console.log("AuthContext: Consulta de perfil Supabase concluída.");
       
       const userProfile = userProfileArray && userProfileArray.length > 0 ? userProfileArray[0] : null;
 
@@ -80,16 +83,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log("AuthContext: onAuthStateChange event:", _event, "session:", session?.user?.id);
       
-      if (session?.user) {
-        setCurrentUser(session.user);
-        const userProfile = await fetchOrCreateProfile(session.user);
-        setProfile(userProfile);
-      } else {
+      try {
+        if (session?.user) {
+          setCurrentUser(session.user);
+          const userProfile = await fetchOrCreateProfile(session.user);
+          if (userProfile) {
+            setProfile(userProfile);
+          } else {
+            // Se o perfil não pôde ser carregado/criado, a sessão pode estar em um estado ruim.
+            // Forçamos o logout para limpar e permitir um novo login.
+            console.error("AuthContext: Falha ao carregar/criar perfil após SIGNED_IN. Forçando logout.");
+            showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
+            await supabase.auth.signOut();
+            setCurrentUser(null);
+            setProfile(null);
+          }
+        } else {
+          setCurrentUser(null);
+          setProfile(null);
+        }
+      } catch (e) {
+        console.error("AuthContext: Erro inesperado no onAuthStateChange:", e);
+        showError("Erro inesperado na autenticação. Por favor, tente novamente.");
         setCurrentUser(null);
         setProfile(null);
+        await supabase.auth.signOut(); // Tenta limpar qualquer estado ruim
+      } finally {
+        setLoading(false);
+        console.log("AuthContext: onAuthStateChange process finished, loading set to false.");
       }
-      setLoading(false);
-      console.log("AuthContext: onAuthStateChange process finished, loading set to false.");
     });
 
     return () => subscription.unsubscribe();
