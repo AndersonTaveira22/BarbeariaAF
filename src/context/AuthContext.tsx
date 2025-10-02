@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { showError, showSuccess } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
@@ -117,9 +117,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log("AuthContext: useEffect iniciado. Setting loading to true.");
     setLoading(true); // Garante que loading seja true no início do efeito
 
+    let globalTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    // Define um tempo limite global para garantir que 'loading' seja false
+    globalTimeoutId = setTimeout(() => {
+      console.warn("AuthContext: Inicialização da autenticação excedeu o tempo limite (10s). Forçando loading para false e logout.");
+      setLoading(false);
+      showError("Tempo limite excedido ao carregar autenticação. Por favor, faça login novamente.");
+      // Força logout para limpar a sessão, mas não navega aqui.
+      supabase.auth.signOut().then(() => {
+          setCurrentUser(null);
+          setProfile(null);
+      });
+    }, 10000); // 10 segundos de tempo limite
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log("AuthContext: onAuthStateChange event:", _event, "session:", session?.user?.id);
       
+      // Limpa o tempo limite global se o onAuthStateChange for disparado
+      if (globalTimeoutId) {
+        clearTimeout(globalTimeoutId);
+        globalTimeoutId = null;
+      }
+
       try {
         if (session?.user) {
           setCurrentUser(session.user);
@@ -156,6 +176,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       console.log("AuthContext: useEffect cleanup.");
       subscription.unsubscribe();
+      if (globalTimeoutId) {
+        clearTimeout(globalTimeoutId);
+      }
     };
   }, []); // Array de dependências vazio para rodar apenas uma vez na montagem
 
