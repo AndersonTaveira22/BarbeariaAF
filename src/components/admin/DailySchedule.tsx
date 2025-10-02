@@ -6,8 +6,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { add, format, startOfDay, endOfDay, set } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Clock, User, Scissors, Lock, Unlock } from 'lucide-react';
+import { Clock, User, Scissors, Lock, Unlock, Trash2 } from 'lucide-react'; // Importado Trash2
 import { showError, showSuccess } from '@/utils/toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'; // Importados componentes do AlertDialog
 
 interface Slot {
   time: Date;
@@ -27,6 +38,8 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
   const { currentUser } = useAuth();
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false); // Estado para controlar o AlertDialog
+  const [appointmentToDelete, setAppointmentToDelete] = useState<string | null>(null); // ID do agendamento a ser deletado
 
   const fetchSchedule = useCallback(async () => {
     if (!currentUser || !selectedDate) {
@@ -166,6 +179,22 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     }
   };
 
+  // Nova função para lidar com o cancelamento do agendamento
+  const handleDeleteAppointment = async () => {
+    if (!appointmentToDelete) return;
+
+    const { error } = await supabase.from('appointments').delete().eq('id', appointmentToDelete);
+
+    if (error) {
+      showError('Erro ao cancelar agendamento: ' + error.message);
+    } else {
+      showSuccess('Agendamento cancelado com sucesso!');
+      fetchSchedule(); // Atualiza a agenda após o cancelamento
+      setAppointmentToDelete(null); // Limpa o ID
+      setShowConfirmDelete(false); // Fecha o diálogo
+    }
+  };
+
   const formattedDate = selectedDate ? format(selectedDate, "eeee, dd 'de' MMMM", { locale: ptBR }) : 'Nenhuma data selecionada';
 
   const renderSlot = (slot: Slot) => {
@@ -173,7 +202,23 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       case 'booked':
         return (
           <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2 text-muted-foreground"><User className="h-4 w-4" /><span>{slot.details?.client_name || 'Nome Indisponível'}</span></div>
+            <div className="flex items-center justify-between"> {/* Adicionado justify-between para alinhar o nome e o botão */}
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <User className="h-4 w-4" />
+                <span>{slot.details?.client_name || 'Nome Indisponível'}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setAppointmentToDelete(slot.details!.id); // Define qual agendamento será deletado
+                  setShowConfirmDelete(true); // Abre o diálogo de confirmação
+                }}
+                className="text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
             <div className="flex items-center gap-2 text-muted-foreground"><Scissors className="h-4 w-4" /><span>{slot.details?.service_name || 'Serviço Indisponível'}</span></div>
           </div>
         );
@@ -208,6 +253,24 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
           <p className="text-center text-muted-foreground py-8">Nenhum agendamento ou horário bloqueado para esta data.</p>
         )}
       </CardContent>
+
+      {/* Diálogo de Confirmação para Cancelar Agendamento */}
+      <AlertDialog open={showConfirmDelete} onOpenChange={setShowConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Isso removerá permanentemente o agendamento do cliente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAppointment} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Confirmar Cancelamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
