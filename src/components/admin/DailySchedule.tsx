@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { add, format, startOfDay, endOfDay, set } from 'date-fns';
-import { ptBR } from 'date-fns/locale'; // Corrigido: removido o '='
+import { ptBR } from 'date-fns/locale';
 import { Clock, User, Scissors, Lock, Unlock } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 
@@ -30,16 +30,18 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
 
   const fetchSchedule = useCallback(async () => {
     if (!currentUser || !selectedDate) {
+      console.log("DailySchedule: currentUser ou selectedDate não definidos.");
       setLoading(false);
       return;
     }
     setLoading(true);
+    console.log("DailySchedule: Buscando agenda para", format(selectedDate, 'yyyy-MM-dd'));
 
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const start = startOfDay(selectedDate).toISOString();
     const end = endOfDay(selectedDate).toISOString();
 
-    // Buscar disponibilidade diária diretamente com .single()
+    // Buscar disponibilidade diária
     const { data: availability, error: availabilityError } = await supabase
       .from('barber_availability')
       .select('start_time, end_time')
@@ -47,23 +49,26 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       .eq('date', dateStr)
       .single();
 
-    // Se não houver disponibilidade diária definida para a data, mostre um erro e pare.
+    console.log("DailySchedule: Disponibilidade diária (raw):", availability, "Erro:", availabilityError);
+
     if (availabilityError || !availability) {
-      // MENSAGEM DE ERRO MAIS DETALHADA
       showError(`Disponibilidade diária não definida para ${dateStr} (Barbeiro ID: ${currentUser.id}). Por favor, defina em "Gerenciar Disponibilidade".`);
       setSlots([]);
       setLoading(false);
       return;
     }
 
-    // Buscar agendamentos e horários bloqueados apenas se a disponibilidade diária for encontrada
+    // Buscar agendamentos e horários bloqueados
     const [appointmentsRes, blockedSlotsRes] = await Promise.all([
       supabase.from('appointments').select('id, appointment_time, client_name, client_phone, profiles(full_name), services(name)').eq('barber_id', currentUser.id).gte('appointment_time', start).lte('appointment_time', end),
       supabase.from('blocked_slots').select('id, start_time').eq('barber_id', currentUser.id).gte('start_time', start).lte('start_time', end)
     ]);
 
-    const { data: appointments } = appointmentsRes;
-    const { data: blockedSlots } = blockedSlotsRes;
+    const { data: appointments, error: appointmentsError } = appointmentsRes;
+    const { data: blockedSlots, error: blockedSlotsError } = blockedSlotsRes;
+
+    console.log("DailySchedule: Agendamentos (raw):", appointments, "Erro:", appointmentsError);
+    console.log("DailySchedule: Horários Bloqueados (raw):", blockedSlots, "Erro:", blockedSlotsError);
 
     const toLocalTimeForComparison = (utcIsoString: string, targetDate: Date) => {
       const utcDate = new Date(utcIsoString);
@@ -83,11 +88,13 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
         service_name: (a.services as any)?.name || 'Serviço Indisponível'
       }
     })) || [];
+    console.log("DailySchedule: Agendamentos processados (bookedTimes):", bookedTimes);
 
     const blockedTimes = blockedSlots?.map(b => ({
       time: toLocalTimeForComparison(b.start_time, selectedDate).getTime(),
       details: { id: b.id }
     })) || [];
+    console.log("DailySchedule: Horários Bloqueados processados (blockedTimes):", blockedTimes);
     
     const allSlots: Slot[] = [];
     const slotDuration = 45;
@@ -98,10 +105,14 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     const endTime = new Date(`${dateStr}T${availability.end_time}`);
     const normalizedEndTime = set(endTime, { milliseconds: 0 });
 
+    console.log(`DailySchedule: Gerando slots de ${format(currentTime, 'HH:mm')} até ${format(normalizedEndTime, 'HH:mm')}`);
+
     while (currentTime < normalizedEndTime) {
       const currentSlotTime = currentTime.getTime();
       const bookedSlot = bookedTimes.find(b => b.time === currentSlotTime);
       const blockedSlot = blockedTimes.find(b => b.time === currentSlotTime);
+
+      console.log(`  Slot: ${format(currentTime, 'HH:mm')}, Timestamp: ${currentSlotTime}, Booked: ${!!bookedSlot}, Blocked: ${!!blockedSlot}`);
 
       if (bookedSlot) {
         allSlots.push({ time: new Date(currentTime), status: 'booked', details: bookedSlot.details });
@@ -114,6 +125,7 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
 
     setSlots(allSlots);
     setLoading(false);
+    console.log("DailySchedule: Slots finais para exibição:", allSlots);
   }, [selectedDate, currentUser]);
 
   useEffect(() => {
