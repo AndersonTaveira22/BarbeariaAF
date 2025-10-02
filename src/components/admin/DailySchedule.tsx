@@ -30,12 +30,10 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
 
   const fetchSchedule = useCallback(async () => {
     if (!currentUser || !selectedDate) {
-      console.log("DailySchedule: currentUser ou selectedDate não definidos.");
       setLoading(false);
       return;
     }
     setLoading(true);
-    console.log("DailySchedule: Buscando agenda para", selectedDate);
 
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const start = startOfDay(selectedDate).toISOString();
@@ -43,24 +41,20 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
 
     const [availabilityRes, appointmentsRes, blockedSlotsRes] = await Promise.all([
       supabase.from('barber_availability').select('start_time, end_time').eq('barber_id', currentUser.id).eq('date', dateStr).single(),
-      supabase.from('appointments').select('id, appointment_time, profiles(full_name), services(name)').eq('barber_id', currentUser.id).gte('appointment_time', start).lte('appointment_time', end),
+      // CORREÇÃO: Incluindo client_name e client_phone na seleção da tabela appointments
+      supabase.from('appointments').select('id, appointment_time, client_name, client_phone, profiles(full_name), services(name)').eq('barber_id', currentUser.id).gte('appointment_time', start).lte('appointment_time', end),
       supabase.from('blocked_slots').select('id, start_time').eq('barber_id', currentUser.id).gte('start_time', start).lte('start_time', end)
     ]);
 
     const { data: availability, error: availabilityError } = availabilityRes;
-    console.log("DailySchedule: Availability data:", availability, "error:", availabilityError);
     if (availabilityError || !availability) {
-      console.log("DailySchedule: Nenhuma disponibilidade encontrada ou erro na busca.");
       setSlots([]);
       setLoading(false);
       return;
     }
 
-    const { data: appointments, error: appointmentsError } = appointmentsRes;
-    console.log("DailySchedule: Appointments data:", appointments, "error:", appointmentsError);
-
-    const { data: blockedSlots, error: blockedSlotsError } = blockedSlotsRes;
-    console.log("DailySchedule: Blocked Slots data:", blockedSlots, "error:", blockedSlotsError);
+    const { data: appointments } = appointmentsRes;
+    const { data: blockedSlots } = blockedSlotsRes;
 
     const toLocalTimeForComparison = (utcIsoString: string, targetDate: Date) => {
       const utcDate = new Date(utcIsoString);
@@ -74,16 +68,18 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
 
     const bookedTimes = appointments?.map(a => ({
       time: toLocalTimeForComparison(a.appointment_time, selectedDate).getTime(),
-      details: { id: a.id, client_name: (a.profiles as any)?.full_name, service_name: (a.services as any)?.name }
+      details: {
+        id: a.id,
+        // Agora a.client_name existe e é tipado corretamente
+        client_name: (a.profiles as any)?.full_name || a.client_name || 'Nome Indisponível',
+        service_name: (a.services as any)?.name || 'Serviço Indisponível'
+      }
     })) || [];
-    console.log("DailySchedule: Processed bookedTimes:", bookedTimes);
-
 
     const blockedTimes = blockedSlots?.map(b => ({
       time: toLocalTimeForComparison(b.start_time, selectedDate).getTime(),
       details: { id: b.id }
     })) || [];
-    console.log("DailySchedule: Processed blockedTimes:", blockedTimes);
     
     const allSlots: Slot[] = [];
     const slotDuration = 45;
@@ -110,7 +106,6 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
 
     setSlots(allSlots);
     setLoading(false);
-    console.log("DailySchedule: Final slots to display:", allSlots);
   }, [selectedDate, currentUser]);
 
   useEffect(() => {
@@ -147,14 +142,14 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       case 'booked':
         return (
           <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2 text-muted-foreground"><User className="h-4 w-4" /><span>{slot.details?.client_name || 'Cliente Desconhecido'}</span></div>
-            <div className="flex items-center gap-2 text-muted-foreground"><Scissors className="h-4 w-4" /><span>{slot.details?.service_name || 'Serviço Desconhecido'}</span></div>
+            <div className="flex items-center gap-2 text-muted-foreground"><User className="h-4 w-4" /><span>{slot.details?.client_name || 'Nome Indisponível'}</span></div>
+            <div className="flex items-center gap-2 text-muted-foreground"><Scissors className="h-4 w-4" /><span>{slot.details?.service_name || 'Serviço Indisponível'}</span></div>
           </div>
         );
       case 'blocked':
         return <div className="flex-1 flex items-center gap-2 text-destructive"><Lock className="h-4 w-4" /><span>Horário Bloqueado</span></div>;
       default:
-        return null; // Não exibe slots 'available'
+        return null;
     }
   };
 
