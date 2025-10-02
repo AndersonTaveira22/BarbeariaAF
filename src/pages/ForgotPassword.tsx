@@ -24,16 +24,15 @@ const ForgotPassword = () => {
     setIsSubmitting(true);
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      // Opcional: Redirecionar o usuário para uma página específica após clicar no link do e-mail
-      // Por exemplo: redirectTo: `${window.location.origin}/update-password`
-      // Por enquanto, vamos apenas informar o usuário para verificar o e-mail.
+      // Redireciona para a nova página de atualização de senha
+      redirectTo: `${window.location.origin}/update-password`,
     });
 
     if (error) {
       showError(error.message);
     } else {
       showSuccess('Verifique seu e-mail para um link de redefinição de senha!');
-      navigate('/login'); // Redireciona para a página de login após o envio
+      // Não redirecionamos para login aqui, pois o link do e-mail levará para UpdatePassword
     }
     setIsSubmitting(false);
   };
