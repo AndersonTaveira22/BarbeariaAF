@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { showSuccess, showError } from '@/utils/toast';
 import BackButton from '@/components/BackButton';
-import { format, startOfDay } from 'date-fns';
+import { format, startOfDay, add } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import AvailabilitySlotsManager from '@/components/admin/AvailabilitySlotsManager'; // Importa o novo componente
 
 interface Availability {
   id: string;
@@ -24,6 +25,7 @@ const AvailabilityPage = () => {
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('18:00');
+  const [hasDailyAvailability, setHasDailyAvailability] = useState(false); // Novo estado para verificar se há disponibilidade diária definida
 
   const fetchAvailabilities = async () => {
     if (!currentUser) return;
@@ -49,9 +51,11 @@ const AvailabilityPage = () => {
       if (existing) {
         setStartTime(existing.start_time.slice(0, 5));
         setEndTime(existing.end_time.slice(0, 5));
+        setHasDailyAvailability(true);
       } else {
         setStartTime('09:00');
         setEndTime('18:00');
+        setHasDailyAvailability(false);
       }
     }
   }, [selectedDate, availabilities]);
@@ -61,7 +65,6 @@ const AvailabilityPage = () => {
 
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
 
-    // Apenas salva a disponibilidade principal do dia
     const { error: availabilityError } = await supabase.from('barber_availability').upsert({
       barber_id: currentUser.id,
       date: formattedDate,
@@ -75,7 +78,7 @@ const AvailabilityPage = () => {
     }
 
     showSuccess('Disponibilidade salva com sucesso!');
-    fetchAvailabilities();
+    fetchAvailabilities(); // Re-busca para atualizar os destaques do calendário
   };
 
   const handleDelete = async () => {
@@ -93,7 +96,9 @@ const AvailabilityPage = () => {
       showError('Erro ao remover horário.');
     } else {
       showSuccess('Horário removido.');
-      fetchAvailabilities();
+      fetchAvailabilities(); // Re-busca para atualizar os destaques do calendário
+      // Também remove todos os slots bloqueados para este dia se a disponibilidade principal for removida
+      await supabase.from('blocked_slots').delete().eq('barber_id', currentUser.id).gte('start_time', startOfDay(selectedDate).toISOString()).lte('start_time', add(startOfDay(selectedDate), { days: 1, seconds: -1 }).toISOString());
     }
   };
 
@@ -106,10 +111,10 @@ const AvailabilityPage = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-3xl font-serif">Gerenciar Disponibilidade</CardTitle>
-            <CardDescription>Selecione um dia no calendário e defina seus horários de trabalho.</CardDescription>
+            <CardDescription>Selecione um dia no calendário e defina seus horários de trabalho, ou bloqueie horários específicos.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="flex justify-center">
+            <div className="flex justify-center flex-col items-center">
               <Calendar
                 mode="single"
                 selected={selectedDate}
@@ -120,9 +125,7 @@ const AvailabilityPage = () => {
                 modifiersStyles={{ available: { border: "2px solid hsl(var(--primary))" } }}
                 locale={ptBR}
               />
-            </div>
-            <div className="space-y-4">
-              <div>
+              <div className="space-y-4 mt-4 w-full max-w-[280px]"> {/* Adicionado max-w para alinhar com o calendário */}
                 <h3 className="text-xl font-serif text-center mb-4">
                   {selectedDate ? format(selectedDate, 'dd \'de\' MMMM, yyyy', { locale: ptBR }) : 'Selecione uma data'}
                 </h3>
@@ -134,12 +137,29 @@ const AvailabilityPage = () => {
                   <Label htmlFor="end-time">Fim do Expediente</Label>
                   <Input id="end-time" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
                 </div>
-              </div>
-              <div className="flex gap-2 pt-4">
-                <Button onClick={handleSave} className="flex-1">Salvar</Button>
-                <Button onClick={handleDelete} variant="destructive" className="flex-1">Remover Dia</Button>
+                <div className="flex gap-2 pt-4">
+                  <Button onClick={handleSave} className="flex-1">Salvar Horário Diário</Button>
+                  <Button onClick={handleDelete} variant="destructive" className="flex-1" disabled={!hasDailyAvailability}>Remover Dia</Button>
+                </div>
               </div>
             </div>
+            {selectedDate && currentUser?.id && hasDailyAvailability ? (
+              <AvailabilitySlotsManager
+                barberId={currentUser.id}
+                selectedDate={selectedDate}
+                dailyStartTime={startTime}
+                dailyEndTime={endTime}
+                onSlotChange={fetchAvailabilities} // Re-busca as disponibilidades do pai para atualizar o calendário
+              />
+            ) : (
+              <div className="flex items-center justify-center text-muted-foreground h-full">
+                {selectedDate ? (
+                  <p>Defina o horário diário para gerenciar os slots.</p>
+                ) : (
+                  <p>Selecione uma data para gerenciar a disponibilidade.</p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
