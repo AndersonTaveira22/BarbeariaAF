@@ -22,28 +22,46 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   console.log("AuthContext: AuthProvider renderizado.");
-  const [currentUser, setCurrentUser] = useState<User | null>(null); // Inicia como null
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true); // Ainda true inicialmente
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   // Helper function to fetch or create profile
   const fetchOrCreateProfile = async (user: User) => {
     console.log("AuthContext: fetchOrCreateProfile chamado para o usuário:", user.id);
+    const PROFILE_FETCH_TIMEOUT = 5000; // 5 segundos de tempo limite para a busca do perfil
+
     try {
       console.log("AuthContext: Tentando consultar perfil no Supabase para ID:", user.id);
-      let { data: userProfileArray, error: profileError } = await supabase
+      
+      const profileFetchPromise = supabase
         .from('profiles')
         .select('id, full_name, role, avatar_url, phone_number')
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .single(); // Adicionado .single()
+
+      const timeoutPromise = new Promise<null>((resolve) =>
+        setTimeout(() => {
+          console.warn("AuthContext: Consulta de perfil excedeu o tempo limite.");
+          resolve(null); // Resolve com null para indicar tempo limite
+        }, PROFILE_FETCH_TIMEOUT)
+      );
+
+      const result = await Promise.race([profileFetchPromise, timeoutPromise]);
+
+      if (result === null) { // Tempo limite ocorreu
+        console.error("AuthContext: Falha ao carregar perfil devido a tempo limite.");
+        return null;
+      }
+
+      const { data: userProfile, error: profileError } = result as { data: Profile | null, error: Error | null };
 
       console.log("AuthContext: Consulta de perfil Supabase concluída.");
-      
-      const userProfile = userProfileArray && userProfileArray.length > 0 ? userProfileArray[0] : null;
-
       console.log("AuthContext: Resultado da consulta de perfil Supabase (fetchOrCreateProfile):", userProfile, "Erro:", profileError);
 
-      if (profileError) {
+      // Correção do erro TypeScript: verifica se 'code' existe em profileError
+      if (profileError && 'code' in profileError && (profileError as any).code !== 'PGRST116') { 
         console.error("AuthContext: Erro ao carregar perfil (fetchOrCreateProfile):", profileError);
         showError('Erro ao carregar perfil: ' + profileError.message);
         return null;
@@ -90,6 +108,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (userProfile) {
             setProfile(userProfile);
           } else {
+            // Se o perfil não pôde ser carregado/criado (incluindo por tempo limite), a sessão pode estar em um estado ruim.
+            // Forçamos o logout para limpar e permitir um novo login.
             console.error("AuthContext: Falha ao carregar/criar perfil. Forçando logout.");
             showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
             await supabase.auth.signOut();
