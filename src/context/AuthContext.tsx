@@ -174,7 +174,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           <p className="text-lg">Carregando autenticação...</p>
         </div>
       ) : (
-        children
+        <React.Fragment key={currentUser?.id || "no-user-after-load"}>
+          {(() => {
+            console.log("AuthContext: Renderizando children. CurrentUser:", currentUser?.id);
+            return null; // Retorna null para satisfazer ReactNode
+          })()}
+          {children}
+        </React.Fragment>
       )}
     </AuthContext.Provider>
   );
