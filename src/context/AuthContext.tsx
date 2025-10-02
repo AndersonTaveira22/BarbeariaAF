@@ -22,7 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   console.log("AuthContext: AuthProvider renderizado.");
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(undefined); // Alterado para undefined para indicar estado inicial de carregamento
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -80,9 +80,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log("AuthContext: useEffect iniciado.");
     setLoading(true);
 
+    const loadInitialSession = async () => {
+      console.log("AuthContext: Tentando carregar sessão inicial com supabase.auth.getSession()...");
+      try {
+        const { data: { session }, error: getSessionError } = await supabase.auth.getSession();
+        console.log("AuthContext: supabase.auth.getSession() concluído. Session:", session, "Error:", getSessionError);
+
+        if (getSessionError) {
+          console.error("AuthContext: Erro ao obter sessão inicial:", getSessionError);
+          showError("Erro ao carregar sessão. Por favor, faça login novamente.");
+          await supabase.auth.signOut(); // Limpa qualquer sessão potencialmente ruim
+          setCurrentUser(null);
+          setProfile(null);
+        } else if (session?.user) {
+          setCurrentUser(session.user);
+          const userProfile = await fetchOrCreateProfile(session.user);
+          if (userProfile) {
+            setProfile(userProfile);
+          } else {
+            console.error("AuthContext: Falha ao carregar/criar perfil após getSession(). Forçando logout.");
+            showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
+            await supabase.auth.signOut();
+            setCurrentUser(null);
+            setProfile(null);
+          }
+        } else {
+          setCurrentUser(null);
+          setProfile(null);
+        }
+      } catch (e) {
+        console.error("AuthContext: Erro inesperado durante loadInitialSession:", e);
+        showError("Erro inesperado ao carregar sessão inicial. Por favor, tente novamente.");
+        setCurrentUser(null);
+        setProfile(null);
+        await supabase.auth.signOut();
+      } finally {
+        setLoading(false);
+        console.log("AuthContext: loadInitialSession finalizado, loading set to false.");
+      }
+    };
+
+    loadInitialSession(); // Chama a função para carregar a sessão inicial
+
+    // O onAuthStateChange ainda é necessário para reagir a mudanças de estado após o carregamento inicial
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log("AuthContext: onAuthStateChange event:", _event, "session:", session?.user?.id);
       
+      // Se o evento for INITIAL_SESSION, já lidamos com ele acima, então podemos ignorar aqui
+      if (_event === 'INITIAL_SESSION') {
+        console.log("AuthContext: onAuthStateChange ignorando INITIAL_SESSION, já tratado por getSession().");
+        return;
+      }
+
       try {
         if (session?.user) {
           setCurrentUser(session.user);
@@ -90,9 +139,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (userProfile) {
             setProfile(userProfile);
           } else {
-            // Se o perfil não pôde ser carregado/criado, a sessão pode estar em um estado ruim.
-            // Forçamos o logout para limpar e permitir um novo login.
-            console.error("AuthContext: Falha ao carregar/criar perfil após SIGNED_IN. Forçando logout.");
+            console.error("AuthContext: Falha ao carregar/criar perfil após onAuthStateChange. Forçando logout.");
             showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
             await supabase.auth.signOut();
             setCurrentUser(null);
@@ -107,10 +154,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         showError("Erro inesperado na autenticação. Por favor, tente novamente.");
         setCurrentUser(null);
         setProfile(null);
-        await supabase.auth.signOut(); // Tenta limpar qualquer estado ruim
+        await supabase.auth.signOut();
       } finally {
-        setLoading(false);
-        console.log("AuthContext: onAuthStateChange process finished, loading set to false.");
+        // Não definimos setLoading(false) aqui, pois loadInitialSession já o faz para o estado inicial.
+        // Para eventos subsequentes, o estado de loading pode ser gerenciado de forma diferente se necessário.
+        console.log("AuthContext: onAuthStateChange process finished.");
       }
     });
 
@@ -125,18 +173,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       showError(error.message);
     } else if (data.user) {
       console.log("AuthContext: Login bem-sucedido para:", data.user.id);
-      const userProfile = await fetchOrCreateProfile(data.user);
-
-      if (userProfile) {
-        setProfile(userProfile);
-        setCurrentUser(data.user);
-        showSuccess('Login realizado com sucesso!');
-        navigate('/');
-      } else {
-        console.error("AuthContext: Falha ao carregar/criar perfil após login.");
-        showError('Não foi possível carregar ou criar os dados do perfil. Por favor, tente novamente.');
-        await supabase.auth.signOut();
-      }
+      // fetchOrCreateProfile será chamado pelo onAuthStateChange que será disparado após o login
+      showSuccess('Login realizado com sucesso!');
+      navigate('/');
     }
   };
 
