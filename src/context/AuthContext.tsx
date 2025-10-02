@@ -22,9 +22,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   console.log("AuthContext: AuthProvider renderizado.");
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null); // Inicia como null
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Ainda true inicialmente
   const navigate = useNavigate();
 
   // Helper function to fetch or create profile
@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .from('profiles')
         .select('id, full_name, role, avatar_url, phone_number')
         .eq('id', user.id)
-        .single(); // Adicionado .single()
+        .single();
 
       const timeoutPromise = new Promise<null>((resolve) =>
         setTimeout(() => {
@@ -60,7 +60,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log("AuthContext: Consulta de perfil Supabase concluída.");
       console.log("AuthContext: Resultado da consulta de perfil Supabase (fetchOrCreateProfile):", userProfile, "Erro:", profileError);
 
-      // Correção do erro TypeScript: verifica se 'code' existe em profileError
       if (profileError && 'code' in profileError && (profileError as any).code !== 'PGRST116') { 
         console.error("AuthContext: Erro ao carregar perfil (fetchOrCreateProfile):", profileError);
         showError('Erro ao carregar perfil: ' + profileError.message);
@@ -108,8 +107,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (userProfile) {
             setProfile(userProfile);
           } else {
-            // Se o perfil não pôde ser carregado/criado (incluindo por tempo limite), a sessão pode estar em um estado ruim.
-            // Forçamos o logout para limpar e permitir um novo login.
             console.error("AuthContext: Falha ao carregar/criar perfil. Forçando logout.");
             showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
             await supabase.auth.signOut();
@@ -167,6 +164,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   console.log("AuthContext: Renderizando AuthProvider. Loading:", loading, "CurrentUser:", currentUser?.id);
 
+  if (!loading) {
+    console.log("AuthContext: Renderizando children (loading é false).");
+  }
+
   return (
     <AuthContext.Provider value={value}>
       {loading ? (
@@ -174,7 +175,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           <p className="text-lg">Carregando autenticação...</p>
         </div>
       ) : (
-        children
+        <React.Fragment key={currentUser ? currentUser.id : "no-user"}>
+          {children}
+        </React.Fragment>
       )}
     </AuthContext.Provider>
   );
