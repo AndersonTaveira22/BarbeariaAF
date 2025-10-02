@@ -117,31 +117,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true); // Garante que loading seja true no início do efeito
 
     let authSubscription: { unsubscribe: () => void } | null = null;
-    let globalTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    // Removido globalTimeoutId, pois onAuthStateChange está disparando e fetchOrCreateProfile tem seu próprio timeout.
 
     const setupAuthListener = async () => {
-      // Define um tempo limite global para garantir que 'loading' seja false
-      globalTimeoutId = setTimeout(() => {
-        console.warn("AuthContext: Inicialização da autenticação excedeu o tempo limite (10s). Forçando loading para false e logout.");
-        setLoading(false);
-        showError("Tempo limite excedido ao carregar autenticação. Por favor, faça login novamente.");
-        // Força logout e navegação para login
-        supabase.auth.signOut().then(() => {
-            setCurrentUser(null);
-            setProfile(null);
-            navigate('/login');
-        });
-      }, 10000); // 10 segundos de tempo limite
-
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => { // Corrigido aqui
         console.log("AuthContext: onAuthStateChange event:", _event, "session:", session?.user?.id);
         
-        // Limpa o tempo limite global se o onAuthStateChange for disparado
-        if (globalTimeoutId) {
-          clearTimeout(globalTimeoutId);
-          globalTimeoutId = null;
-        }
-
         try {
           if (session?.user) {
             setCurrentUser(session.user);
@@ -150,13 +131,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               setProfile(userProfile);
             } else {
               // Se o perfil não pôde ser carregado/criado (incluindo por tempo limite), a sessão pode estar em um estado ruim.
-              // Forçamos o logout para limpar e permitir um novo login.
               console.error("AuthContext: Falha ao carregar/criar perfil. Forçando logout e redirecionamento.");
               showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
               await supabase.auth.signOut();
               setCurrentUser(null);
               setProfile(null);
-              navigate('/login'); // Navega explicitamente para login
+              setLoading(false); // Garante que loading seja false antes de navegar
+              navigate('/login'); 
+              return; // Sai cedo após a navegação
             }
           } else {
             setCurrentUser(null);
@@ -164,7 +146,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Se não há sessão, e não estamos em uma página de autenticação, navega para login
             const currentPath = window.location.pathname;
             if (!['/login', '/register', '/forgot-password', '/update-password'].includes(currentPath)) {
+                setLoading(false); // Garante que loading seja false antes de navegar
                 navigate('/login');
+                return; // Sai cedo após a navegação
             }
           }
         } catch (e) {
@@ -173,13 +157,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setCurrentUser(null);
           setProfile(null);
           await supabase.auth.signOut();
-          navigate('/login'); // Navega explicitamente para login em caso de erro
+          setLoading(false); // Garante que loading seja false antes de navegar
+          navigate('/login'); 
+          return; // Sai cedo após a navegação
         } finally {
-          setLoading(false); // Garante que loading seja definido como false aqui
+          // Este bloco finally só será alcançado se nenhuma saída antecipada (return) tiver ocorrido.
+          // Se já navegamos, loading já é false. Caso contrário, definimos aqui.
+          if (loading) { // Só define como false se ainda for true
+             setLoading(false); 
+          }
           console.log("AuthContext: onAuthStateChange process finished, loading set to false.");
         }
       });
-      authSubscription = subscription; // Atribui a subscription corretamente
+      authSubscription = data.subscription; // Atribui a subscription corretamente
     };
 
     setupAuthListener();
@@ -189,11 +179,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (authSubscription) {
         authSubscription.unsubscribe();
       }
-      if (globalTimeoutId) {
-        clearTimeout(globalTimeoutId);
-      }
     };
-  }, [navigate]); // Adiciona navigate como dependência
+  }, [navigate, loading]); // Adicionado loading às dependências para garantir que a lógica do finally esteja correta
 
   const login = async (email, password) => {
     console.log("AuthContext: Tentando login para:", email);
@@ -225,7 +212,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           <p className="text-lg">Carregando autenticação...</p>
         </div>
       ) : (
-        children
+        // Adicionado um console.log para verificar o estado de loading antes de renderizar children
+        <>
+          {console.log("AuthContext: Renderizando children. Loading:", loading, "CurrentUser:", currentUser?.id)}
+          {children}
+        </>
       )}
     </AuthContext.Provider>
   );
