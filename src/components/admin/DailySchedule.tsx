@@ -39,19 +39,24 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     const start = startOfDay(selectedDate).toISOString();
     const end = endOfDay(selectedDate).toISOString();
 
-    const [availabilityRes, appointmentsRes, blockedSlotsRes] = await Promise.all([
-      supabase.from('barber_availability').select('start_time, end_time').eq('barber_id', currentUser.id).eq('date', dateStr).single(),
-      // CORREÇÃO: Incluindo client_name e client_phone na seleção da tabela appointments
+    // Modificado para buscar todas as disponibilidades e filtrar pela data
+    const [allAvailabilitiesRes, appointmentsRes, blockedSlotsRes] = await Promise.all([
+      supabase.from('barber_availability').select('start_time, end_time, date').eq('barber_id', currentUser.id),
       supabase.from('appointments').select('id, appointment_time, client_name, client_phone, profiles(full_name), services(name)').eq('barber_id', currentUser.id).gte('appointment_time', start).lte('appointment_time', end),
       supabase.from('blocked_slots').select('id, start_time').eq('barber_id', currentUser.id).gte('start_time', start).lte('start_time', end)
     ]);
 
-    const { data: availability, error: availabilityError } = availabilityRes;
-    if (availabilityError || !availability) {
+    const { data: allAvailabilities, error: availabilityError } = allAvailabilitiesRes;
+    const currentDayAvailability = allAvailabilities?.find(a => a.date === dateStr);
+
+    if (availabilityError || !currentDayAvailability) {
+      // Adiciona um toast para feedback visual se a disponibilidade não for encontrada
+      showError('Disponibilidade diária não definida para esta data. Por favor, defina em "Gerenciar Disponibilidade".');
       setSlots([]);
       setLoading(false);
       return;
     }
+    const availability = currentDayAvailability; // Usa a disponibilidade encontrada
 
     const { data: appointments } = appointmentsRes;
     const { data: blockedSlots } = blockedSlotsRes;
@@ -70,7 +75,6 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       time: toLocalTimeForComparison(a.appointment_time, selectedDate).getTime(),
       details: {
         id: a.id,
-        // Agora a.client_name existe e é tipado corretamente
         client_name: (a.profiles as any)?.full_name || a.client_name || 'Nome Indisponível',
         service_name: (a.services as any)?.name || 'Serviço Indisponível'
       }
