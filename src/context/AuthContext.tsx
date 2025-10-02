@@ -29,16 +29,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Helper function to fetch or create profile
   const fetchOrCreateProfile = async (user: User) => {
     console.log("AuthContext: fetchOrCreateProfile chamado para o usuário:", user.id);
+    console.log("AuthContext: Objeto Supabase:", supabase); // NOVO LOG: Verificando o objeto supabase
+
     try {
+      // --- Consulta de teste para verificar a funcionalidade básica do Supabase ---
+      console.log("AuthContext: TESTE - Tentando consultar a tabela 'services'...");
+      const { data: testData, error: testError } = await supabase
+        .from('services')
+        .select('id')
+        .limit(1);
+      
+      if (testError) {
+        console.error("AuthContext: TESTE - Erro na consulta de 'services':", testError);
+        showError('Erro de teste Supabase: ' + testError.message);
+        // Não retornamos aqui, continuamos para a consulta de perfil para ver se o problema é específico
+      } else {
+        console.log("AuthContext: TESTE - Consulta de 'services' bem-sucedida:", testData);
+      }
+      // --- Fim da consulta de teste ---
+
       console.log("AuthContext: PRE-QUERY - Tentando consultar perfil no Supabase para ID:", user.id);
       let { data: userProfileArray, error: profileError } = await supabase
         .from('profiles')
         .select('id') // SIMPLIFICADO PARA APENAS 'id' para depuração
         .eq('id', user.id);
 
-      console.log("AuthContext: AFTER AWAIT - Consulta de perfil Supabase concluída."); // NOVO LOG AQUI
+      console.log("AuthContext: AFTER AWAIT - Consulta de perfil Supabase concluída.");
       
-      // Se .single() foi removido, data será um array. Precisamos pegar o primeiro elemento.
       const userProfile = userProfileArray && userProfileArray.length > 0 ? userProfileArray[0] : null;
 
       console.log("AuthContext: Resultado da consulta de perfil Supabase:", userProfile, "Erro:", profileError);
@@ -66,9 +83,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return newProfile;
       }
       
-      // Se o perfil foi encontrado com apenas 'id', precisamos buscar os outros dados
-      // Isso é um passo de diagnóstico. Se a consulta acima funcionar, esta segunda consulta
-      // nos dirá se o problema está nas outras colunas ou RLS.
       const { data: fullProfile, error: fullProfileError } = await supabase
         .from('profiles')
         .select('id, full_name, role, avatar_url, phone_number')
