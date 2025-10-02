@@ -21,63 +21,72 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null); // Inicializado como null
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true); // Começa como true
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   // Helper function to fetch or create profile
   const fetchOrCreateProfile = async (user: User) => {
-    let { data: userProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError && profileError.code === 'PGRST116') { // No rows found
-      console.log("AuthContext: Perfil não encontrado, criando um novo.");
-      const { data: newProfile, error: insertError } = await supabase
+    console.log("AuthContext: fetchOrCreateProfile chamado para o usuário:", user.id); // NOVO LOG
+    try {
+      let { data: userProfile, error: profileError } = await supabase
         .from('profiles')
-        .insert({ id: user.id, full_name: user.email?.split('@')[0] || 'Usuário Novo', role: 'cliente' })
-        .select()
+        .select('*')
+        .eq('id', user.id)
         .single();
 
-      if (insertError) {
-        console.error("AuthContext: Erro ao criar perfil básico:", insertError);
-        showError('Erro ao criar perfil básico: ' + insertError.message);
+      console.log("AuthContext: Resultado da consulta de perfil Supabase:", userProfile, "Erro:", profileError); // NOVO LOG
+
+      if (profileError && profileError.code === 'PGRST116') { // No rows found
+        console.log("AuthContext: Perfil não encontrado, criando um novo.");
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({ id: user.id, full_name: user.email?.split('@')[0] || 'Usuário Novo', role: 'cliente' })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("AuthContext: Erro ao criar perfil básico:", insertError);
+          showError('Erro ao criar perfil básico: ' + insertError.message);
+          return null;
+        }
+        showSuccess('Perfil criado automaticamente.');
+        return newProfile;
+      } else if (profileError) {
+        console.error("AuthContext: Erro ao carregar perfil:", profileError);
+        showError('Erro ao carregar perfil: ' + profileError.message);
         return null;
       }
-      showSuccess('Perfil criado automaticamente.');
-      return newProfile;
-    } else if (profileError) {
-      console.error("AuthContext: Erro ao carregar perfil:", profileError);
-      showError('Erro ao carregar perfil: ' + profileError.message);
+      console.log("AuthContext: Perfil carregado:", userProfile);
+      return userProfile;
+    } catch (e) {
+      console.error("AuthContext: Erro inesperado em fetchOrCreateProfile:", e); // NOVO CATCH
+      showError("Erro inesperado ao buscar/criar perfil.");
       return null;
     }
-    console.log("AuthContext: Perfil carregado:", userProfile);
-    return userProfile;
   };
 
   useEffect(() => {
-    setLoading(true); // Garante que o estado de carregamento seja true ao iniciar o listener
+    setLoading(true);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log("AuthContext: onAuthStateChange event:", _event, "session:", session?.user?.id);
       
       if (session?.user) {
         setCurrentUser(session.user);
-        const userProfile = await fetchOrCreateProfile(session.user);
+        const userProfile = await fetchOrCreateProfile(session.user); // Ponto de potencial travamento
         setProfile(userProfile);
       } else {
         setCurrentUser(null);
         setProfile(null);
       }
-      setLoading(false); // Define loading como false APÓS processar o estado de autenticação
+      setLoading(false);
       console.log("AuthContext: onAuthStateChange process finished, loading set to false.");
     });
 
     return () => subscription.unsubscribe();
-  }, []); // O array de dependências vazio garante que o useEffect rode apenas uma vez na montagem
+  }, []);
 
   const login = async (email, password) => {
     console.log("AuthContext: Tentando login para:", email);
@@ -97,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         console.error("AuthContext: Falha ao carregar/criar perfil após login.");
         showError('Não foi possível carregar ou criar os dados do perfil. Por favor, tente novamente.');
-        await supabase.auth.signOut(); // Desloga se o perfil falhar
+        await supabase.auth.signOut();
       }
     }
   };
