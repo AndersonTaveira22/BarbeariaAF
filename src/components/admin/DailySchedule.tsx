@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { add, format, startOfDay, endOfDay, set } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Clock, User, Scissors, Lock, Unlock, Trash2 } from 'lucide-react'; // Importado Trash2
+import { Clock, User, Scissors, Lock, Unlock, Trash2, Phone } from 'lucide-react'; // Importado Phone
 import { showError, showSuccess } from '@/utils/toast';
 import {
   AlertDialog,
@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'; // Importados componentes do AlertDialog
+} from '@/components/ui/alert-dialog';
 
 interface Slot {
   time: Date;
@@ -26,6 +26,7 @@ interface Slot {
   details?: {
     id: string;
     client_name?: string;
+    client_phone?: string; // Adicionado client_phone
     service_name?: string;
   };
 }
@@ -38,8 +39,8 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
   const { currentUser } = useAuth();
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showConfirmDelete, setShowConfirmDelete] = useState(false); // Estado para controlar o AlertDialog
-  const [appointmentToDelete, setAppointmentToDelete] = useState<string | null>(null); // ID do agendamento a ser deletado
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [appointmentToDelete, setAppointmentToDelete] = useState<string | null>(null);
 
   const fetchSchedule = useCallback(async () => {
     if (!currentUser || !selectedDate) {
@@ -52,7 +53,6 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     const start = startOfDay(selectedDate).toISOString();
     const end = endOfDay(selectedDate).toISOString();
 
-    // 1. Buscar disponibilidade diária
     const { data: availability, error: availabilityError } = await supabase
       .from('barber_availability')
       .select('start_time, end_time')
@@ -67,8 +67,8 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       return;
     }
 
-    // 2. Buscar agendamentos (simplificado, sem joins aninhados) e horários bloqueados
     const [appointmentsRes, blockedSlotsRes] = await Promise.all([
+      // Incluindo client_phone na seleção
       supabase.from('appointments').select('id, appointment_time, client_id, service_id, client_name, client_phone').eq('barber_id', currentUser.id).gte('appointment_time', start).lte('appointment_time', end),
       supabase.from('blocked_slots').select('id, start_time').eq('barber_id', currentUser.id).gte('start_time', start).lte('start_time', end)
     ]);
@@ -85,7 +85,6 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       showError('Erro ao buscar horários bloqueados: ' + blockedSlotsError.message);
     }
 
-    // 3. Buscar nomes de clientes e serviços separadamente
     const clientIds = [...new Set(appointments?.map(a => a.client_id).filter(Boolean))] as string[];
     const serviceIds = [...new Set(appointments?.map(a => a.service_id).filter(Boolean))] as string[];
 
@@ -114,8 +113,8 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       time: toLocalTimeForComparison(a.appointment_time, selectedDate).getTime(),
       details: {
         id: a.id,
-        // Prioriza o nome do perfil, depois o nome salvo no agendamento
         client_name: clientNamesMap.get(a.client_id) || a.client_name || 'Nome Indisponível',
+        client_phone: a.client_phone || 'Telefone Indisponível', // Atribuindo client_phone
         service_name: serviceNamesMap.get(a.service_id) || 'Serviço Indisponível'
       }
     })) || [];
@@ -179,7 +178,6 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     }
   };
 
-  // Nova função para lidar com o cancelamento do agendamento
   const handleDeleteAppointment = async () => {
     if (!appointmentToDelete) return;
 
@@ -189,10 +187,21 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       showError('Erro ao cancelar agendamento: ' + error.message);
     } else {
       showSuccess('Agendamento cancelado com sucesso!');
-      fetchSchedule(); // Atualiza a agenda após o cancelamento
-      setAppointmentToDelete(null); // Limpa o ID
-      setShowConfirmDelete(false); // Fecha o diálogo
+      fetchSchedule();
+      setAppointmentToDelete(null);
+      setShowConfirmDelete(false);
     }
+  };
+
+  const formatPhoneNumberForWhatsApp = (phone: string) => {
+    // Remove todos os caracteres não numéricos e adiciona o código do país (55 para Brasil)
+    const digitsOnly = phone.replace(/\D/g, '');
+    if (digitsOnly.length === 11) { // Ex: 99 99999-9999
+      return `55${digitsOnly}`;
+    } else if (digitsOnly.length === 10) { // Ex: 99 9999-9999
+      return `55${digitsOnly}`;
+    }
+    return digitsOnly; // Retorna como está se não for um formato comum
   };
 
   const formattedDate = selectedDate ? format(selectedDate, "eeee, dd 'de' MMMM", { locale: ptBR }) : 'Nenhuma data selecionada';
@@ -202,7 +211,7 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       case 'booked':
         return (
           <div className="flex-1 space-y-2">
-            <div className="flex items-center justify-between"> {/* Adicionado justify-between para alinhar o nome e o botão */}
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <User className="h-4 w-4" />
                 <span>{slot.details?.client_name || 'Nome Indisponível'}</span>
@@ -211,14 +220,25 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setAppointmentToDelete(slot.details!.id); // Define qual agendamento será deletado
-                  setShowConfirmDelete(true); // Abre o diálogo de confirmação
+                  setAppointmentToDelete(slot.details!.id);
+                  setShowConfirmDelete(true);
                 }}
                 className="text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
+            {slot.details?.client_phone && slot.details.client_phone !== 'Telefone Indisponível' && (
+              <a
+                href={`https://wa.me/${formatPhoneNumberForWhatsApp(slot.details.client_phone)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-primary hover:underline"
+              >
+                <Phone className="h-4 w-4" />
+                <span>{slot.details.client_phone}</span>
+              </a>
+            )}
             <div className="flex items-center gap-2 text-muted-foreground"><Scissors className="h-4 w-4" /><span>{slot.details?.service_name || 'Serviço Indisponível'}</span></div>
           </div>
         );
@@ -254,7 +274,6 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
         )}
       </CardContent>
 
-      {/* Diálogo de Confirmação para Cancelar Agendamento */}
       <AlertDialog open={showConfirmDelete} onOpenChange={setShowConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
