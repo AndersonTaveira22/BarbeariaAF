@@ -94,6 +94,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Função de logout estável
+  const logout = async () => {
+    console.log("AuthContext: Tentando logout para:", currentUser?.id);
+    await supabase.auth.signOut();
+    setProfile(null);
+    setCurrentUser(null);
+    showSuccess('Você foi desconectado.');
+    navigate('/login');
+  };
+
   useEffect(() => {
     console.log("AuthContext: useEffect iniciado. Setting loading to true.");
     setLoading(true); // Garante que loading seja true no início do efeito
@@ -104,16 +114,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const setupAuthListener = async () => {
       // Define um tempo limite global para garantir que 'loading' seja false
       globalTimeoutId = setTimeout(() => {
-        console.warn("AuthContext: Inicialização da autenticação excedeu o tempo limite (10s). Forçando loading para false.");
+        console.warn("AuthContext: Inicialização da autenticação excedeu o tempo limite (10s). Forçando loading para false e logout.");
         setLoading(false);
-        showError("Tempo limite excedido ao carregar autenticação. Por favor, tente novamente.");
-        // Opcional: Forçar logout aqui se um tempo limite implica um estado corrompido
-        supabase.auth.signOut();
-        setCurrentUser(null);
-        setProfile(null);
+        showError("Tempo limite excedido ao carregar autenticação. Por favor, faça login novamente.");
+        // Força logout e navegação para login
+        supabase.auth.signOut().then(() => {
+            setCurrentUser(null);
+            setProfile(null);
+            navigate('/login');
+        });
       }, 10000); // 10 segundos de tempo limite
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => { // Corrigido aqui
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
         console.log("AuthContext: onAuthStateChange event:", _event, "session:", session?.user?.id);
         
         // Limpa o tempo limite global se o onAuthStateChange for disparado
@@ -129,15 +141,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (userProfile) {
               setProfile(userProfile);
             } else {
-              console.error("AuthContext: Falha ao carregar/criar perfil. Forçando logout.");
+              // Se o perfil não pôde ser carregado/criado (incluindo por tempo limite), a sessão pode estar em um estado ruim.
+              // Forçamos o logout para limpar e permitir um novo login.
+              console.error("AuthContext: Falha ao carregar/criar perfil. Forçando logout e redirecionamento.");
               showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
               await supabase.auth.signOut();
               setCurrentUser(null);
               setProfile(null);
+              navigate('/login'); // Navega explicitamente para login
             }
           } else {
             setCurrentUser(null);
             setProfile(null);
+            // Se não há sessão, e não estamos em uma página de autenticação, navega para login
+            const currentPath = window.location.pathname;
+            if (!['/login', '/register', '/forgot-password', '/update-password'].includes(currentPath)) {
+                navigate('/login');
+            }
           }
         } catch (e) {
           console.error("AuthContext: Erro inesperado no onAuthStateChange:", e);
@@ -145,6 +165,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setCurrentUser(null);
           setProfile(null);
           await supabase.auth.signOut();
+          navigate('/login'); // Navega explicitamente para login em caso de erro
         } finally {
           setLoading(false); // Garante que loading seja definido como false aqui
           console.log("AuthContext: onAuthStateChange process finished, loading set to false.");
@@ -164,7 +185,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         clearTimeout(globalTimeoutId);
       }
     };
-  }, []); // Array de dependências vazio para rodar apenas uma vez na montagem
+  }, [navigate]); // Adiciona navigate como dependência
 
   const login = async (email, password) => {
     console.log("AuthContext: Tentando login para:", email);
@@ -178,15 +199,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       showSuccess('Login realizado com sucesso!');
       navigate('/');
     }
-  };
-
-  const logout = async () => {
-    console.log("AuthContext: Tentando logout para:", currentUser?.id);
-    await supabase.auth.signOut();
-    setProfile(null);
-    setCurrentUser(null);
-    showSuccess('Você foi desconectado.');
-    navigate('/login');
   };
 
   const value = {
