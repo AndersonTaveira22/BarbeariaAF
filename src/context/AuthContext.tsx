@@ -30,15 +30,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Helper function to fetch or create profile
   const fetchOrCreateProfile = async (user: User) => {
     console.log("AuthContext: fetchOrCreateProfile chamado para o usuário:", user.id);
-    console.log("AuthContext: Objeto Supabase (dentro de fetchOrCreateProfile):", supabase); // Log detalhado do objeto Supabase
     try {
-      console.log("AuthContext: ANTES DO AWAIT - Tentando consultar perfil no Supabase para ID:", user.id); // NOVO LOG AQUI
       let { data: userProfileArray, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, role, avatar_url, phone_number') // Mantendo as colunas necessárias
+        .select('id, full_name, role, avatar_url, phone_number')
         .eq('id', user.id);
-
-      console.log("AuthContext: DEPOIS DO AWAIT - Consulta de perfil Supabase concluída."); // NOVO LOG AQUI
       
       const userProfile = userProfileArray && userProfileArray.length > 0 ? userProfileArray[0] : null;
 
@@ -79,7 +75,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     console.log("AuthContext: useEffect iniciado.");
-    console.log("AuthContext: Objeto Supabase (dentro de useEffect):", supabase); // Log detalhado do objeto Supabase
     setLoading(true);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {

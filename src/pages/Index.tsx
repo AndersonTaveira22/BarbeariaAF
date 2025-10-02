@@ -2,6 +2,7 @@ import { MadeWithDyad } from "@/components/made-with-dyad";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { Link } from "react-router-dom";
+import SupabaseTest from "@/components/SupabaseTest"; // Importando o componente de teste
 
 const Index = () => {
   const { currentUser, profile, logout } = useAuth();
@@ -44,6 +45,7 @@ const Index = () => {
             </div>
           </div>
         )}
+        <SupabaseTest /> {/* Adicionando o componente de teste aqui */}
       </div>
       <div className="absolute bottom-4">
         <MadeWithDyad />
