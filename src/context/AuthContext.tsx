@@ -20,11 +20,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => { // CORREÇÃO AQUI
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   console.log("AuthContext: AuthProvider renderizado.");
   const [currentUser, setCurrentUser] = useState<User | null | undefined>(undefined); // undefined para indicar carregamento
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false); // Novo estado para rastrear se o carregamento inicial terminou
   const navigate = useNavigate();
 
   // Helper function to fetch or create profile
@@ -97,31 +98,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // CORR
     console.log("AuthContext: useEffect iniciado.");
     setLoading(true); // Garante que o estado de carregamento seja true no início
 
+    // Watchdog para o processo de autenticação inicial
+    const initialLoadTimeout = setTimeout(() => {
+      if (!initialLoadComplete) {
+        console.error("AuthContext: Processo de autenticação inicial excedeu o tempo limite. Forçando limpeza de sessão e recarregamento.");
+        showError("O carregamento da sessão excedeu o tempo limite. Limpando dados e recarregando.");
+        // Tenta fazer logout para limpar o armazenamento local do Supabase, depois força o recarregamento
+        supabase.auth.signOut().then(() => {
+          window.location.reload();
+        }).catch(e => {
+          console.error("AuthContext: Erro durante signOut no timeout:", e);
+          window.location.reload(); // Fallback para recarregamento direto
+        });
+      }
+    }, 10000); // 10 segundos de tempo limite para o carregamento inicial
+
     const handleAuthSession = async (session: Session | null) => {
-      if (session?.user) {
-        setCurrentUser(session.user);
-        const userProfile = await fetchOrCreateProfile(session.user);
-        if (userProfile) {
-          setProfile(userProfile);
+      try {
+        if (session?.user) {
+          setCurrentUser(session.user);
+          const userProfile = await fetchOrCreateProfile(session.user);
+          if (userProfile) {
+            setProfile(userProfile);
+          } else {
+            console.error("AuthContext: Falha ao carregar/criar perfil. Forçando logout.");
+            showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
+            await supabase.auth.signOut();
+            setCurrentUser(null);
+            setProfile(null);
+          }
         } else {
-          console.error("AuthContext: Falha ao carregar/criar perfil. Forçando logout.");
-          showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
-          await supabase.auth.signOut();
           setCurrentUser(null);
           setProfile(null);
         }
-      } else {
+      } catch (e) {
+        console.error("AuthContext: Erro inesperado em handleAuthSession:", e);
+        showError("Erro inesperado na autenticação. Por favor, tente novamente.");
         setCurrentUser(null);
         setProfile(null);
+        await supabase.auth.signOut();
+      } finally {
+        setLoading(false); // Define loading como false após processar a sessão
+        setInitialLoadComplete(true); // Marca que o carregamento inicial foi concluído
+        console.log("AuthContext: handleAuthSession finalizado, loading set to false.");
       }
-      setLoading(false); // Define loading como false após processar a sessão
-      console.log("AuthContext: handleAuthSession finalizado, loading set to false.");
     };
 
     // Lida com a sessão inicial
     const loadInitialSession = async () => {
       const { data: { session: initialSession } } = await supabase.auth.getSession();
-      handleAuthSession(initialSession);
+      await handleAuthSession(initialSession);
     };
     loadInitialSession();
 
@@ -138,7 +164,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // CORR
       await handleAuthSession(session);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(initialLoadTimeout); // Limpa o watchdog se o processo de autenticação terminar normalmente
+      subscription.unsubscribe();
+    };
   }, []); // Array de dependências vazio para rodar apenas uma vez na montagem
 
   const login = async (email, password) => {
@@ -174,7 +203,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // CORR
   console.log("AuthContext: Renderizando AuthProvider. Loading:", loading, "CurrentUser:", currentUser?.id);
 
   return (
-    <AuthContext.Provider value={value} key={loading ? "loading-auth" : "loaded-auth"}>
+    <AuthContext.Provider value={value}>
       {loading ? (
         <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
           <p className="text-lg">Carregando autenticação...</p>
