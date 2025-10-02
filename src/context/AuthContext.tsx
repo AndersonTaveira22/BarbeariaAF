@@ -29,39 +29,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Helper function to fetch or create profile
   const fetchOrCreateProfile = async (user: User) => {
     console.log("AuthContext: fetchOrCreateProfile chamado para o usuário:", user.id);
-    console.log("AuthContext: Objeto Supabase:", supabase); // NOVO LOG: Verificando o objeto supabase
-
+    // A consulta de teste foi movida para o useEffect principal para isolamento.
+    // Esta função agora assume que o Supabase está funcionando.
     try {
-      // --- Consulta de teste para verificar a funcionalidade básica do Supabase ---
-      console.log("AuthContext: TESTE - Tentando consultar a tabela 'services'...");
-      const { data: testData, error: testError } = await supabase
-        .from('services')
-        .select('id')
-        .limit(1);
-      
-      if (testError) {
-        console.error("AuthContext: TESTE - Erro na consulta de 'services':", testError);
-        showError('Erro de teste Supabase: ' + testError.message);
-        // Não retornamos aqui, continuamos para a consulta de perfil para ver se o problema é específico
-      } else {
-        console.log("AuthContext: TESTE - Consulta de 'services' bem-sucedida:", testData);
-      }
-      // --- Fim da consulta de teste ---
-
-      console.log("AuthContext: PRE-QUERY - Tentando consultar perfil no Supabase para ID:", user.id);
+      console.log("AuthContext: PRE-QUERY (fetchOrCreateProfile) - Tentando consultar perfil no Supabase para ID:", user.id);
       let { data: userProfileArray, error: profileError } = await supabase
         .from('profiles')
-        .select('id') // SIMPLIFICADO PARA APENAS 'id' para depuração
+        .select('id, full_name, role, avatar_url, phone_number') // Voltando a selecionar todas as colunas necessárias
         .eq('id', user.id);
 
-      console.log("AuthContext: AFTER AWAIT - Consulta de perfil Supabase concluída.");
+      console.log("AuthContext: AFTER AWAIT (fetchOrCreateProfile) - Consulta de perfil Supabase concluída.");
       
       const userProfile = userProfileArray && userProfileArray.length > 0 ? userProfileArray[0] : null;
 
-      console.log("AuthContext: Resultado da consulta de perfil Supabase:", userProfile, "Erro:", profileError);
+      console.log("AuthContext: Resultado da consulta de perfil Supabase (fetchOrCreateProfile):", userProfile, "Erro:", profileError);
 
       if (profileError) {
-        console.error("AuthContext: Erro ao carregar perfil:", profileError);
+        console.error("AuthContext: Erro ao carregar perfil (fetchOrCreateProfile):", profileError);
         showError('Erro ao carregar perfil: ' + profileError.message);
         return null;
       }
@@ -83,20 +67,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return newProfile;
       }
       
-      const { data: fullProfile, error: fullProfileError } = await supabase
-        .from('profiles')
-        .select('id, full_name, role, avatar_url, phone_number')
-        .eq('id', user.id)
-        .single();
-
-      if (fullProfileError) {
-        console.error("AuthContext: Erro ao carregar perfil completo após ID:", fullProfileError);
-        showError('Erro ao carregar perfil completo: ' + fullProfileError.message);
-        return null;
-      }
-
-      console.log("AuthContext: Perfil carregado:", fullProfile);
-      return fullProfile;
+      console.log("AuthContext: Perfil carregado:", userProfile);
+      return userProfile;
 
     } catch (e) {
       console.error("AuthContext: Erro inesperado em fetchOrCreateProfile:", e);
@@ -107,6 +79,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     setLoading(true);
+    console.log("AuthContext: useEffect iniciado. Objeto Supabase:", supabase); // Log do objeto Supabase aqui também
+
+    // --- Consulta de teste movida para o useEffect principal ---
+    const runTestQuery = async () => {
+      console.log("AuthContext: TESTE (useEffect) - Tentando consultar a tabela 'services'...");
+      try {
+        // Envolvendo em setTimeout para ver se ajuda a "desbloquear"
+        setTimeout(async () => {
+          const { data: testData, error: testError } = await supabase
+            .from('services')
+            .select('id')
+            .limit(1);
+          
+          if (testError) {
+            console.error("AuthContext: TESTE (useEffect) - Erro na consulta de 'services':", testError);
+            showError('Erro de teste Supabase (useEffect): ' + testError.message);
+          } else {
+            console.log("AuthContext: TESTE (useEffect) - Consulta de 'services' bem-sucedida:", testData);
+          }
+        }, 0); // Executa no próximo tick do event loop
+      } catch (e) {
+        console.error("AuthContext: TESTE (useEffect) - Erro inesperado na consulta de 'services':", e);
+        showError("Erro inesperado na consulta de teste Supabase.");
+      }
+    };
+    runTestQuery();
+    // --- Fim da consulta de teste ---
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log("AuthContext: onAuthStateChange event:", _event, "session:", session?.user?.id);
