@@ -30,7 +30,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Helper function to fetch or create profile
   const fetchOrCreateProfile = async (user: User) => {
     console.log("AuthContext: fetchOrCreateProfile chamado para o usuário:", user.id);
-    const PROFILE_FETCH_TIMEOUT = 5000; // 5 segundos de tempo limite para a busca do perfil
+    const PROFILE_FETCH_TIMEOUT = 10000; // Aumentado para 10 segundos
+    console.log(`AuthContext: Tempo limite para consulta de perfil: ${PROFILE_FETCH_TIMEOUT / 1000}s`);
 
     try {
       console.log("AuthContext: Tentando consultar perfil no Supabase para ID:", user.id);
@@ -39,7 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .from('profiles')
         .select('id, full_name, role, avatar_url, phone_number')
         .eq('id', user.id)
-        .single(); // Adicionado .single()
+        .single();
 
       const timeoutPromise = new Promise<null>((resolve) =>
         setTimeout(() => {
@@ -60,11 +61,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log("AuthContext: Consulta de perfil Supabase concluída.");
       console.log("AuthContext: Resultado da consulta de perfil Supabase (fetchOrCreateProfile):", userProfile, "Erro:", profileError);
 
-      // Correção do erro TypeScript: verifica se 'code' existe em profileError
-      if (profileError && 'code' in profileError && (profileError as any).code !== 'PGRST116') { 
-        console.error("AuthContext: Erro ao carregar perfil (fetchOrCreateProfile):", profileError);
-        showError('Erro ao carregar perfil: ' + profileError.message);
-        return null;
+      if (profileError) {
+        if ('code' in profileError && (profileError as any).code !== 'PGRST116') { 
+          console.error("AuthContext: Erro ao carregar perfil (fetchOrCreateProfile):", profileError);
+          showError('Erro ao carregar perfil: ' + profileError.message);
+          return null;
+        } else if ('code' in profileError && (profileError as any).code === 'PGRST116') {
+          console.log("AuthContext: Perfil não encontrado (PGRST116), tentando criar um novo.");
+        } else {
+          console.error("AuthContext: Erro inesperado ao carregar perfil (sem código PGRST116):", profileError);
+          showError('Erro inesperado ao carregar perfil: ' + profileError.message);
+          return null;
+        }
       }
       
       if (!userProfile) {
