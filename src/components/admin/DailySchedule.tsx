@@ -39,24 +39,28 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     const start = startOfDay(selectedDate).toISOString();
     const end = endOfDay(selectedDate).toISOString();
 
-    // Modificado para buscar todas as disponibilidades e filtrar pela data
-    const [allAvailabilitiesRes, appointmentsRes, blockedSlotsRes] = await Promise.all([
-      supabase.from('barber_availability').select('start_time, end_time, date').eq('barber_id', currentUser.id),
-      supabase.from('appointments').select('id, appointment_time, client_name, client_phone, profiles(full_name), services(name)').eq('barber_id', currentUser.id).gte('appointment_time', start).lte('appointment_time', end),
-      supabase.from('blocked_slots').select('id, start_time').eq('barber_id', currentUser.id).gte('start_time', start).lte('start_time', end)
-    ]);
+    // MODIFICAÇÃO CRÍTICA: Buscar disponibilidade diária diretamente com .single()
+    // Isso garante que a lógica de busca seja idêntica ao AvailabilitySlotsManager, que está funcionando.
+    const { data: availability, error: availabilityError } = await supabase
+      .from('barber_availability')
+      .select('start_time, end_time')
+      .eq('barber_id', currentUser.id)
+      .eq('date', dateStr)
+      .single();
 
-    const { data: allAvailabilities, error: availabilityError } = allAvailabilitiesRes;
-    const currentDayAvailability = allAvailabilities?.find(a => a.date === dateStr);
-
-    if (availabilityError || !currentDayAvailability) {
-      // Adiciona um toast para feedback visual se a disponibilidade não for encontrada
+    // Se não houver disponibilidade diária definida para a data, mostre um erro e pare.
+    if (availabilityError || !availability) {
       showError('Disponibilidade diária não definida para esta data. Por favor, defina em "Gerenciar Disponibilidade".');
       setSlots([]);
       setLoading(false);
       return;
     }
-    const availability = currentDayAvailability; // Usa a disponibilidade encontrada
+
+    // Buscar agendamentos e horários bloqueados apenas se a disponibilidade diária for encontrada
+    const [appointmentsRes, blockedSlotsRes] = await Promise.all([
+      supabase.from('appointments').select('id, appointment_time, client_name, client_phone, profiles(full_name), services(name)').eq('barber_id', currentUser.id).gte('appointment_time', start).lte('appointment_time', end),
+      supabase.from('blocked_slots').select('id, start_time').eq('barber_id', currentUser.id).gte('start_time', start).lte('start_time', end)
+    ]);
 
     const { data: appointments } = appointmentsRes;
     const { data: blockedSlots } = blockedSlotsRes;
