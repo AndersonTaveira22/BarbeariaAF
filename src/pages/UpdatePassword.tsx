@@ -24,8 +24,6 @@ const UpdatePassword = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // O Supabase lida com a sessão automaticamente quando o usuário clica no link de redefinição.
-    // Podemos verificar se há um usuário logado para garantir que o fluxo está correto.
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -55,10 +53,14 @@ const UpdatePassword = () => {
     const { data, error } = await supabase.auth.updateUser({ password });
 
     if (error) {
-      showError(error.message);
+      let errorMessage = error.message;
+      if (errorMessage.includes('New password should be different from the old password')) {
+        errorMessage = 'A nova senha deve ser diferente da senha antiga.';
+      }
+      showError(errorMessage);
     } else {
       showSuccess('Sua senha foi redefinida com sucesso! Você já está logado.');
-      navigate('/'); // Redireciona para a página inicial após a redefinição
+      navigate('/');
     }
     setIsSubmitting(false);
   };
