@@ -4,15 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const SupabaseTest = () => {
+  console.log("SupabaseTest: Componente SupabaseTest renderizado."); // NOVO LOG AQUI
   const [testResult, setTestResult] = useState<string | null>(null);
   const [loadingTest, setLoadingTest] = useState(true);
 
   useEffect(() => {
     const runSupabaseTest = async () => {
-      console.log("SupabaseTest: Iniciando teste de conexão Supabase...");
+      console.log("SupabaseTest: Iniciando teste de conexão Supabase (dentro do useEffect)...");
       setLoadingTest(true);
       try {
-        console.log("SupabaseTest: Objeto Supabase:", supabase); // Log do objeto Supabase
+        console.log("SupabaseTest: Objeto Supabase (dentro do useEffect):", supabase);
         console.log("SupabaseTest: ANTES DO AWAIT - Tentando consultar a tabela 'services'...");
         const { data, error } = await supabase
           .from('services')
