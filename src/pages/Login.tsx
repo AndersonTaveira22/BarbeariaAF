@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,10 +19,6 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
-
-  useEffect(() => {
-    console.log("Login component mounted."); // Adicionado este log
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
