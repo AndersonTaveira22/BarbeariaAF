@@ -25,27 +25,35 @@ const AppContent = () => {
 
   useEffect(() => {
     console.log("AppContent: useEffect. Loading:", loading, "CurrentUser:", currentUser?.id, "Path:", location.pathname);
-    // Se não estiver carregando e não houver usuário, e não estivermos em uma rota de autenticação, redirecionar para login
-    if (!loading && !currentUser) {
-      const authRoutes = ['/login', '/register', '/forgot-password', '/update-password'];
-      if (!authRoutes.includes(location.pathname)) {
-        console.log("AppContent: Não logado e não em rota de autenticação, redirecionando para /login");
-        navigate('/login');
-      }
+    const authRoutes = ['/login', '/register', '/forgot-password', '/update-password'];
+
+    // Se a autenticação ainda estiver carregando, não faz nada.
+    if (loading) {
+      console.log("AppContent: Auth still loading, waiting...");
+      return;
     }
+
+    // Se não estiver logado e não estiver em uma rota de autenticação, redirecionar para login.
+    if (!currentUser && !authRoutes.includes(location.pathname)) {
+      console.log("AppContent: Não logado e não em rota de autenticação, redirecionando para /login");
+      navigate('/login');
+      return;
+    }
+
     // Se estiver logado e em uma rota de autenticação, redirecionar para a home.
-    if (!loading && currentUser) {
-      const authRoutes = ['/login', '/register', '/forgot-password', '/update-password'];
-      if (authRoutes.includes(location.pathname)) {
-        console.log("AppContent: Logado e em rota de autenticação, redirecionando para /.");
-        navigate('/');
-      }
+    if (currentUser && authRoutes.includes(location.pathname)) {
+      console.log("AppContent: Logado e em rota de autenticação, redirecionando para /.");
+      navigate('/');
+      return;
     }
+
+    console.log("AppContent: No navigation needed for current state.");
+
   }, [currentUser, loading, navigate, location.pathname]);
 
-  // Se o AuthProvider ainda estiver carregando, mostre a tela de carregamento global
+  // Renderiza a tela de carregamento se a autenticação ainda estiver em progresso
   if (loading) {
-    console.log("AppContent: AuthProvider ainda está carregando, mostrando tela de carregamento.");
+    console.log("AppContent: Showing global loading screen (loading: " + loading + ")");
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <p className="text-lg">Carregando autenticação...</p>
@@ -53,6 +61,8 @@ const AppContent = () => {
     );
   }
 
+  // Uma vez que o carregamento é falso, renderiza as rotas.
+  console.log("AppContent: AuthProvider finished loading, rendering routes.");
   return (
     <Routes>
       {/* Public Routes */}

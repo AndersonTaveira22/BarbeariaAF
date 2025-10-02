@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (result === null) { // Tempo limite ocorreu
         console.error("AuthContext: fetchOrCreateProfile retornou null devido a tempo limite.");
-        // Apenas força logout e exibe erro, a navegação será gerenciada pelo App.tsx
+        // Apenas força logout e exibe erro. App.tsx gerenciará a navegação.
         await supabase.auth.signOut();
         showError('Não foi possível carregar os dados do perfil devido a tempo limite. Por favor, faça login novamente.');
         return null;
@@ -131,7 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.warn("AuthContext: Inicialização da autenticação excedeu o tempo limite (10s). Forçando loading para false e logout.");
       setLoading(false);
       showError("Tempo limite excedido ao carregar autenticação. Por favor, faça login novamente.");
-      // Força logout para limpar a sessão, mas não navega aqui.
+      // Força logout para limpar a sessão. App.tsx gerenciará a navegação.
       supabase.auth.signOut().then(() => {
           setCurrentUser(null);
           setProfile(null);
