@@ -30,26 +30,22 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
 
   const fetchSchedule = useCallback(async () => {
     if (!currentUser || !selectedDate) {
-      console.log("DailySchedule: currentUser ou selectedDate não definidos.");
       setLoading(false);
       return;
     }
     setLoading(true);
-    console.log("DailySchedule: Buscando agenda para", format(selectedDate, 'yyyy-MM-dd'));
 
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const start = startOfDay(selectedDate).toISOString();
     const end = endOfDay(selectedDate).toISOString();
 
-    // Buscar disponibilidade diária
+    // 1. Buscar disponibilidade diária
     const { data: availability, error: availabilityError } = await supabase
       .from('barber_availability')
       .select('start_time, end_time')
       .eq('barber_id', currentUser.id)
       .eq('date', dateStr)
       .single();
-
-    console.log("DailySchedule: Disponibilidade diária (raw):", availability, "Erro:", availabilityError);
 
     if (availabilityError || !availability) {
       showError(`Disponibilidade diária não definida para ${dateStr} (Barbeiro ID: ${currentUser.id}). Por favor, defina em "Gerenciar Disponibilidade".`);
@@ -58,17 +54,38 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       return;
     }
 
-    // Buscar agendamentos e horários bloqueados
+    // 2. Buscar agendamentos (simplificado, sem joins aninhados) e horários bloqueados
     const [appointmentsRes, blockedSlotsRes] = await Promise.all([
-      supabase.from('appointments').select('id, appointment_time, client_name, client_phone, profiles(full_name), services(name)').eq('barber_id', currentUser.id).gte('appointment_time', start).lte('appointment_time', end),
+      supabase.from('appointments').select('id, appointment_time, client_id, service_id, client_name, client_phone').eq('barber_id', currentUser.id).gte('appointment_time', start).lte('appointment_time', end),
       supabase.from('blocked_slots').select('id, start_time').eq('barber_id', currentUser.id).gte('start_time', start).lte('start_time', end)
     ]);
 
     const { data: appointments, error: appointmentsError } = appointmentsRes;
     const { data: blockedSlots, error: blockedSlotsError } = blockedSlotsRes;
 
-    console.log("DailySchedule: Agendamentos (raw):", appointments, "Erro:", appointmentsError);
-    console.log("DailySchedule: Horários Bloqueados (raw):", blockedSlots, "Erro:", blockedSlotsError);
+    if (appointmentsError) {
+      showError('Erro ao buscar agendamentos: ' + appointmentsError.message);
+      setLoading(false);
+      return;
+    }
+    if (blockedSlotsError) {
+      showError('Erro ao buscar horários bloqueados: ' + blockedSlotsError.message);
+    }
+
+    // 3. Buscar nomes de clientes e serviços separadamente
+    const clientIds = [...new Set(appointments?.map(a => a.client_id).filter(Boolean))] as string[];
+    const serviceIds = [...new Set(appointments?.map(a => a.service_id).filter(Boolean))] as string[];
+
+    const [profilesRes, servicesRes] = await Promise.all([
+      clientIds.length > 0 ? supabase.from('profiles').select('id, full_name').in('id', clientIds) : Promise.resolve({ data: [], error: null }),
+      serviceIds.length > 0 ? supabase.from('services').select('id, name').in('id', serviceIds) : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    const clientNamesMap = new Map<string, string>();
+    profilesRes.data?.forEach(p => clientNamesMap.set(p.id, p.full_name));
+
+    const serviceNamesMap = new Map<string, string>();
+    servicesRes.data?.forEach(s => serviceNamesMap.set(s.id, s.name));
 
     const toLocalTimeForComparison = (utcIsoString: string, targetDate: Date) => {
       const utcDate = new Date(utcIsoString);
@@ -84,17 +101,16 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       time: toLocalTimeForComparison(a.appointment_time, selectedDate).getTime(),
       details: {
         id: a.id,
-        client_name: (a.profiles as any)?.full_name || a.client_name || 'Nome Indisponível',
-        service_name: (a.services as any)?.name || 'Serviço Indisponível'
+        // Prioriza o nome do perfil, depois o nome salvo no agendamento
+        client_name: clientNamesMap.get(a.client_id) || a.client_name || 'Nome Indisponível',
+        service_name: serviceNamesMap.get(a.service_id) || 'Serviço Indisponível'
       }
     })) || [];
-    console.log("DailySchedule: Agendamentos processados (bookedTimes):", bookedTimes);
 
     const blockedTimes = blockedSlots?.map(b => ({
       time: toLocalTimeForComparison(b.start_time, selectedDate).getTime(),
       details: { id: b.id }
     })) || [];
-    console.log("DailySchedule: Horários Bloqueados processados (blockedTimes):", blockedTimes);
     
     const allSlots: Slot[] = [];
     const slotDuration = 45;
@@ -105,14 +121,10 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     const endTime = new Date(`${dateStr}T${availability.end_time}`);
     const normalizedEndTime = set(endTime, { milliseconds: 0 });
 
-    console.log(`DailySchedule: Gerando slots de ${format(currentTime, 'HH:mm')} até ${format(normalizedEndTime, 'HH:mm')}`);
-
     while (currentTime < normalizedEndTime) {
       const currentSlotTime = currentTime.getTime();
       const bookedSlot = bookedTimes.find(b => b.time === currentSlotTime);
       const blockedSlot = blockedTimes.find(b => b.time === currentSlotTime);
-
-      console.log(`  Slot: ${format(currentTime, 'HH:mm')}, Timestamp: ${currentSlotTime}, Booked: ${!!bookedSlot}, Blocked: ${!!blockedSlot}`);
 
       if (bookedSlot) {
         allSlots.push({ time: new Date(currentTime), status: 'booked', details: bookedSlot.details });
@@ -125,7 +137,6 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
 
     setSlots(allSlots);
     setLoading(false);
-    console.log("DailySchedule: Slots finais para exibição:", allSlots);
   }, [selectedDate, currentUser]);
 
   useEffect(() => {
