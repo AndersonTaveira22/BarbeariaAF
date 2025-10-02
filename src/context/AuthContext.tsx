@@ -22,7 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   console.log("AuthContext: AuthProvider renderizado.");
-  const [currentUser, setCurrentUser] = useState<User | null>(undefined); // undefined para indicar estado inicial de carregamento
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -141,13 +141,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    loadInitialSession(); // Chama a função para carregar a sessão inicial
+    loadInitialSession();
 
-    // O onAuthStateChange ainda é necessário para reagir a mudanças de estado após o carregamento inicial
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log("AuthContext: onAuthStateChange event:", _event, "session:", session?.user?.id);
       
-      // Se o evento for INITIAL_SESSION, já lidamos com ele acima, então podemos ignorar aqui
       if (_event === 'INITIAL_SESSION') {
         console.log("AuthContext: onAuthStateChange ignorando INITIAL_SESSION, já tratado por getSession().");
         return;
@@ -177,8 +175,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProfile(null);
         await supabase.auth.signOut();
       } finally {
-        // Não definimos setLoading(false) aqui, pois loadInitialSession já o faz para o estado inicial.
-        // Para eventos subsequentes, o estado de loading pode ser gerenciado de forma diferente se necessário.
         console.log("AuthContext: onAuthStateChange process finished.");
       }
     });
@@ -194,9 +190,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       showError(error.message);
     } else if (data.user) {
       console.log("AuthContext: Login bem-sucedido para:", data.user.id);
-      // fetchOrCreateProfile será chamado pelo onAuthStateChange que será disparado após o login
-      showSuccess('Login realizado com sucesso!');
-      navigate('/');
+      // Directly set user and profile after successful login
+      setCurrentUser(data.user);
+      const userProfile = await fetchOrCreateProfile(data.user);
+      if (userProfile) {
+        setProfile(userProfile);
+        showSuccess('Login realizado com sucesso!');
+        navigate('/');
+      } else {
+        console.error("AuthContext: Falha ao carregar/criar perfil após login. Forçando logout.");
+        showError('Não foi possível carregar ou criar os dados do perfil. Por favor, tente novamente.');
+        await supabase.auth.signOut();
+        setCurrentUser(null);
+        setProfile(null);
+      }
     }
   };
 
@@ -216,14 +223,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logout,
   };
 
+  console.log("AuthContext: Renderizando AuthProvider. Loading:", loading, "CurrentUser:", currentUser?.id);
+
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={value} key={loading ? "loading" : "loaded"}>
       {loading ? (
         <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
           <p className="text-lg">Carregando autenticação...</p>
         </div>
       ) : (
-        children
+        <React.Fragment key={currentUser?.id || "no-user"}>
+          {children}
+        </React.Fragment>
       )}
     </AuthContext.Provider>
   );
