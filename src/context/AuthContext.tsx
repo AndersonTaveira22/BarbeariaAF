@@ -28,17 +28,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Helper function to fetch or create profile
   const fetchOrCreateProfile = async (user: User) => {
-    console.log("AuthContext: fetchOrCreateProfile chamado para o usuário:", user.id); // NOVO LOG
+    console.log("AuthContext: fetchOrCreateProfile chamado para o usuário:", user.id);
     try {
-      let { data: userProfile, error: profileError } = await supabase
+      console.log("AuthContext: PRE-QUERY - Tentando consultar perfil no Supabase para ID:", user.id); // NOVO LOG AQUI
+      let { data: userProfileArray, error: profileError } = await supabase
         .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+        .select('id, full_name, role, avatar_url, phone_number') // Selecionando colunas explicitamente
+        .eq('id', user.id); // Removendo .single() para teste
 
-      console.log("AuthContext: Resultado da consulta de perfil Supabase:", userProfile, "Erro:", profileError); // NOVO LOG
+      console.log("AuthContext: POST-QUERY - Consulta de perfil Supabase concluída."); // NOVO LOG AQUI
 
-      if (profileError && profileError.code === 'PGRST116') { // No rows found
+      // Se .single() foi removido, data será um array. Precisamos pegar o primeiro elemento.
+      const userProfile = userProfileArray && userProfileArray.length > 0 ? userProfileArray[0] : null;
+
+      console.log("AuthContext: Resultado da consulta de perfil Supabase:", userProfile, "Erro:", profileError);
+
+      if (profileError) { // Se houver erro, mesmo que não seja PGRST116
+        console.error("AuthContext: Erro ao carregar perfil:", profileError);
+        showError('Erro ao carregar perfil: ' + profileError.message);
+        return null;
+      }
+      
+      if (!userProfile) { // Se nenhum perfil foi encontrado
         console.log("AuthContext: Perfil não encontrado, criando um novo.");
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
@@ -53,15 +64,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         showSuccess('Perfil criado automaticamente.');
         return newProfile;
-      } else if (profileError) {
-        console.error("AuthContext: Erro ao carregar perfil:", profileError);
-        showError('Erro ao carregar perfil: ' + profileError.message);
-        return null;
       }
+      
       console.log("AuthContext: Perfil carregado:", userProfile);
       return userProfile;
     } catch (e) {
-      console.error("AuthContext: Erro inesperado em fetchOrCreateProfile:", e); // NOVO CATCH
+      console.error("AuthContext: Erro inesperado em fetchOrCreateProfile:", e);
       showError("Erro inesperado ao buscar/criar perfil.");
       return null;
     }
@@ -75,7 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (session?.user) {
         setCurrentUser(session.user);
-        const userProfile = await fetchOrCreateProfile(session.user); // Ponto de potencial travamento
+        const userProfile = await fetchOrCreateProfile(session.user);
         setProfile(userProfile);
       } else {
         setCurrentUser(null);
