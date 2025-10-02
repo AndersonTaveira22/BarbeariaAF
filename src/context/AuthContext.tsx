@@ -27,12 +27,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate(); // Mantemos navigate para uso em login/logout
-  const [shouldRenderChildren, setShouldRenderChildren] = useState(false); // Novo estado para controlar a renderização dos children
 
   // Helper function to fetch or create profile
   const fetchOrCreateProfile = async (user: User) => {
     console.log("AuthContext: fetchOrCreateProfile chamado para o usuário:", user.id);
-    const PROFILE_FETCH_TIMEOUT = 10000; // Aumentado para 10 segundos
+    const PROFILE_FETCH_TIMEOUT = 15000; // Aumentado para 15 segundos
     console.log(`AuthContext: Tempo limite para consulta de perfil: ${PROFILE_FETCH_TIMEOUT / 1000}s`);
 
     try {
@@ -54,7 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const result = await Promise.race([profileFetchPromise, timeoutPromise]);
 
       if (result === null) { // Tempo limite ocorreu
-        console.error("AuthContext: Falha ao carregar perfil devido a tempo limite.");
+        console.error("AuthContext: fetchOrCreateProfile retornou null devido a tempo limite.");
         return null;
       }
 
@@ -117,7 +116,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     console.log("AuthContext: useEffect iniciado. Setting loading to true.");
     setLoading(true); // Garante que loading seja true no início do efeito
-    setShouldRenderChildren(false); // Reseta o estado de renderização dos children
 
     let globalTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -181,21 +179,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []); // Array de dependências vazio para rodar apenas uma vez na montagem
 
-  // Efeito para controlar a renderização dos children após o carregamento
-  useEffect(() => {
-    if (!loading) {
-      // Se não está mais carregando, permite a renderização dos children após um pequeno atraso
-      // Isso dá tempo para o AppContent processar a navegação se o usuário não estiver logado
-      const timer = setTimeout(() => {
-        setShouldRenderChildren(true);
-      }, 100); // Pequeno atraso de 100ms
-      return () => clearTimeout(timer);
-    } else {
-      setShouldRenderChildren(false); // Se estiver carregando, não renderiza os children
-    }
-  }, [loading]);
-
-
   const login = async (email, password) => {
     console.log("AuthContext: Tentando login para:", email);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -222,12 +205,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {loading || !shouldRenderChildren ? ( // Mostra tela de carregamento se ainda estiver carregando ou se os children não devem ser renderizados ainda
+      {loading ? ( // Mostra tela de carregamento se ainda estiver carregando
         <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
           <p className="text-lg">Carregando autenticação...</p>
         </div>
       ) : (
-        children // Renderiza os children apenas quando shouldRenderChildren for true
+        children // Renderiza os children apenas quando loading for false
       )}
     </AuthContext.Provider>
   );
