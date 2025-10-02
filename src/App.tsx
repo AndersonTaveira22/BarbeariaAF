@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, useNavigate, useLocation } from "react-router-dom"; // Importar useNavigate e useLocation
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
@@ -13,8 +13,8 @@ import NewAppointment from "./pages/NewAppointment";
 import AdminDashboard from "./pages/admin/Dashboard";
 import Availability from "./pages/admin/Availability";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { AuthProvider, useAuth } from "./context/AuthContext"; // Importar useAuth
-import { useEffect } from "react"; // Importar useEffect
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
@@ -30,7 +30,11 @@ const AppContent = () => {
       const authRoutes = ['/login', '/register', '/forgot-password', '/update-password'];
       if (!authRoutes.includes(location.pathname)) {
         console.log("AppContent: Não logado e não em rota de autenticação, redirecionando para /login");
-        navigate('/login');
+        // Adiciona um pequeno atraso para garantir que o estado 'loading' seja processado
+        const timer = setTimeout(() => {
+          navigate('/login');
+        }, 50); // Pequeno atraso de 50ms
+        return () => clearTimeout(timer); // Limpa o timer se o componente for desmontado ou dependências mudarem
       }
     }
   }, [currentUser, loading, navigate, location.pathname]);
