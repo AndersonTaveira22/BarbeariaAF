@@ -22,7 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   console.log("AuthContext: AuthProvider renderizado.");
-  const [currentUser, setCurrentUser] = useState<User | null>(undefined); // Alterado para undefined para indicar estado inicial de carregamento
+  const [currentUser, setCurrentUser] = useState<User | null>(undefined); // undefined para indicar estado inicial de carregamento
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -82,31 +82,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const loadInitialSession = async () => {
       console.log("AuthContext: Tentando carregar sessão inicial com supabase.auth.getSession()...");
-      try {
-        const { data: { session }, error: getSessionError } = await supabase.auth.getSession();
-        console.log("AuthContext: supabase.auth.getSession() concluído. Session:", session, "Error:", getSessionError);
+      const SESSION_LOAD_TIMEOUT = 5000; // 5 segundos de tempo limite
 
-        if (getSessionError) {
-          console.error("AuthContext: Erro ao obter sessão inicial:", getSessionError);
-          showError("Erro ao carregar sessão. Por favor, faça login novamente.");
-          await supabase.auth.signOut(); // Limpa qualquer sessão potencialmente ruim
+      try {
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<null>((resolve) =>
+          setTimeout(() => {
+            console.warn("AuthContext: supabase.auth.getSession() excedeu o tempo limite.");
+            resolve(null); // Resolve com null para indicar tempo limite
+          }, SESSION_LOAD_TIMEOUT)
+        );
+
+        const result = await Promise.race([sessionPromise, timeoutPromise]);
+
+        if (result === null) { // Tempo limite ocorreu
+          console.error("AuthContext: Falha ao carregar sessão inicial devido a tempo limite. Forçando limpeza de sessão.");
+          showError("Erro ao carregar sessão. Limpando dados e tentando novamente.");
+          await supabase.auth.signOut(); // Isso deve limpar o armazenamento local do Supabase
           setCurrentUser(null);
           setProfile(null);
-        } else if (session?.user) {
-          setCurrentUser(session.user);
-          const userProfile = await fetchOrCreateProfile(session.user);
-          if (userProfile) {
-            setProfile(userProfile);
-          } else {
-            console.error("AuthContext: Falha ao carregar/criar perfil após getSession(). Forçando logout.");
-            showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
+        } else { // A promessa da sessão resolveu (com dados ou erro)
+          const { data: { session }, error: getSessionError } = result as { data: { session: Session | null }, error: Error | null };
+
+          console.log("AuthContext: supabase.auth.getSession() concluído. Session:", session, "Error:", getSessionError);
+
+          if (getSessionError) {
+            console.error("AuthContext: Erro ao obter sessão inicial:", getSessionError);
+            showError("Erro ao carregar sessão. Por favor, faça login novamente.");
             await supabase.auth.signOut();
             setCurrentUser(null);
             setProfile(null);
+          } else if (session?.user) {
+            setCurrentUser(session.user);
+            const userProfile = await fetchOrCreateProfile(session.user);
+            if (userProfile) {
+              setProfile(userProfile);
+            } else {
+              console.error("AuthContext: Falha ao carregar/criar perfil após getSession(). Forçando logout.");
+              showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
+              await supabase.auth.signOut();
+              setCurrentUser(null);
+              setProfile(null);
+            }
+          } else {
+            setCurrentUser(null);
+            setProfile(null);
           }
-        } else {
-          setCurrentUser(null);
-          setProfile(null);
         }
       } catch (e) {
         console.error("AuthContext: Erro inesperado durante loadInitialSession:", e);
