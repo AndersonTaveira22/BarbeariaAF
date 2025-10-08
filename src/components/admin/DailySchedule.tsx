@@ -243,11 +243,11 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       case 'blocked':
         return (
           <div className="flex-1 flex items-center justify-end gap-2">
-            <div className="flex items-center gap-1 text-destructive text-sm"> {/* Adicionado text-sm */}
+            <div className="flex items-center gap-0.5 text-destructive text-xs"> {/* gap-0.5 e text-xs */}
               <Lock className="h-4 w-4" />
               <span>Bloqueado</span>
             </div>
-            <Button variant="secondary" size="sm" onClick={() => handleUnblock(slot.details!.id)} className="flex-shrink-0 px-2 py-1 h-auto text-sm"> {/* Adicionado text-sm */}
+            <Button variant="secondary" size="sm" onClick={() => handleUnblock(slot.details!.id)} className="flex-shrink-0 px-1 py-0.5 h-auto text-xs"> {/* px-1 py-0.5 e text-xs */}
               <Unlock className="h-3 w-3 mr-1" />
               Desbloquear
             </Button>
