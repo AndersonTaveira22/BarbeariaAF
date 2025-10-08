@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'; // Adicionado useRef
 import { useNavigate } from 'react-router-dom';
 import { showError, showSuccess } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null | undefined>(undefined); // undefined para indicar carregamento
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false); // Novo estado para rastrear se o carregamento inicial terminou
+  const initialLoadCompleteRef = useRef(false); // Usando useRef para initialLoadComplete
   const navigate = useNavigate();
 
   // Helper function to fetch or create profile
@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Watchdog para o processo de autenticação inicial
     const initialLoadTimeout = setTimeout(() => {
-      if (!initialLoadComplete) {
+      if (!initialLoadCompleteRef.current) { // Verifica o valor atual do ref
         console.error("AuthContext: Processo de autenticação inicial excedeu o tempo limite. Forçando limpeza de sessão e recarregamento.");
         showError("O carregamento da sessão excedeu o tempo limite. Limpando dados e recarregando.");
         // Tenta fazer logout para limpar o armazenamento local do Supabase, depois força o recarregamento
@@ -139,8 +139,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await supabase.auth.signOut();
       } finally {
         setLoading(false); // Define loading como false após processar a sessão
-        setInitialLoadComplete(true); // Marca que o carregamento inicial foi concluído
-        console.log("AuthContext: handleAuthSession finalizado, loading set to false.");
+        initialLoadCompleteRef.current = true; // Atualiza o valor do ref
+        console.log("AuthContext: handleAuthSession finalizado. Loading set to false, initialLoadCompleteRef.current set to true.");
       }
     };
 
