@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom'; // Linha corrigida aqui
 import { Skeleton } from '@/components/ui/skeleton';
 import BackButton from '@/components/BackButton';
 import { showError, showSuccess } from '@/utils/toast';
@@ -87,6 +87,7 @@ const NewAppointment = () => {
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 significa que nenhuma linha foi encontrada, o que é normal
+        console.error("Supabase error fetching existing appointment:", error); // Adicionado log de erro
         showError('Erro ao buscar agendamento existente: ' + error.message);
         setExistingAppointment(null);
       } else if (data) {
