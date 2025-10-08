@@ -14,6 +14,7 @@ interface Profile {
 interface AuthContextType {
   currentUser: User | null | undefined; // undefined para indicar estado de carregamento inicial
   profile: Profile | null;
+  isEmailVerified: boolean; // Adicionado: status de verificação do e-mail
   login: (email, password) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -27,6 +28,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const initialLoadCompleteRef = useRef(false); // Usando useRef para initialLoadComplete
   const navigate = useNavigate();
+
+  // Deriva o status de verificação do e-mail
+  const isEmailVerified = !!currentUser?.email_confirmed_at;
 
   // Helper function to fetch or create profile
   const fetchOrCreateProfile = async (user: User) => {
@@ -114,10 +118,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, 10000); // 10 segundos de tempo limite para o carregamento inicial
 
     const handleAuthSession = async (session: Session | null) => {
-      // Esta função agora apenas lida com a definição de usuário/perfil com base em uma sessão
-      // O try/catch/finally para o estado de carregamento será fora desta função.
       if (session?.user) {
         setCurrentUser(session.user);
+        console.log("AuthContext: Current user set. Email confirmed at:", session.user.email_confirmed_at); // LOG DE DEPURACAO
         const userProfile = await fetchOrCreateProfile(session.user);
         if (userProfile) {
           setProfile(userProfile);
@@ -199,11 +202,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = {
     currentUser,
     profile,
+    isEmailVerified, // Adicionado ao valor do contexto
     login,
     logout,
   };
 
-  console.log("AuthContext: Renderizando AuthProvider. Loading:", loading, "CurrentUser:", currentUser?.id);
+  console.log("AuthContext: Renderizando AuthProvider. Loading:", loading, "CurrentUser:", currentUser?.id, "Email Verified:", isEmailVerified);
 
   return (
     <AuthContext.Provider value={value}>

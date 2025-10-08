@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Link } from "react-router-dom";
 
 const Index = () => {
-  const { currentUser, profile, logout } = useAuth();
+  const { currentUser, profile, logout, isEmailVerified } = useAuth();
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background">
@@ -11,8 +11,11 @@ const Index = () => {
         <h1 className="text-6xl font-serif font-bold mb-4 text-foreground">Bem-vindo à Barbearia AF</h1>
         {currentUser && profile ? (
           <div>
-            <p className="text-xl text-muted-foreground mb-8">
+            <p className="text-xl text-muted-foreground mb-2">
               Olá, {profile.full_name}! O que vamos fazer hoje?
+            </p>
+            <p className={`text-lg mb-8 ${isEmailVerified ? 'text-green-500' : 'text-red-500'}`}>
+              Email {isEmailVerified ? 'verificado' : 'NÃO verificado'}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
                <Button asChild size="lg">
