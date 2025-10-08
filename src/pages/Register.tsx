@@ -43,8 +43,13 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Card className="mx-auto max-w-sm border-border">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
+      <img
+        src="https://fhneddlnsiccucvmuftm.supabase.co/storage/v1/object/public/foto%20logo/Logo-Barbearia.png"
+        alt="Barbearia AF Logo"
+        className="mx-auto mb-8 w-32 h-32 object-contain"
+      />
+      <Card className="mx-auto max-w-sm border-border w-full">
         <CardHeader>
           <CardTitle className="text-3xl font-serif">Cadastro</CardTitle>
           <CardDescription>
