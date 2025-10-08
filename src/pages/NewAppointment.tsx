@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/AuthContext';
-import { useNavigate } from 'react-router-dom'; // Linha corrigida aqui
+import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import BackButton from '@/components/BackButton';
 import { showError, showSuccess } from '@/utils/toast';
@@ -78,7 +78,7 @@ const NewAppointment = () => {
           client_phone,
           barber_id,
           service_id,
-          barber:profiles(id, full_name, avatar_url),
+          barber:profiles!fk_barber_id(id, full_name, avatar_url),
           service:services(id, name, price)
         `)
         .eq('client_id', currentUser.id)
