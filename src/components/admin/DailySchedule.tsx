@@ -242,13 +242,13 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
         );
       case 'blocked':
         return (
-          <div className="flex items-center justify-end flex-1 gap-2"> {/* Novo contêiner para status bloqueado */}
-            <div className="flex items-center gap-2 text-destructive">
+          <div className="flex-1 flex items-center justify-end gap-2"> {/* Este div ocupa o espaço restante e alinha o conteúdo à direita */}
+            <div className="flex items-center gap-1 text-destructive"> {/* Agrupa ícone e texto */}
               <Lock className="h-4 w-4" />
-              <span>Horário Bloqueado</span>
+              <span>Bloqueado</span> {/* Texto mais curto */}
             </div>
-            <Button variant="secondary" size="sm" onClick={() => handleUnblock(slot.details!.id)} className="flex-shrink-0">
-              <Unlock className="mr-1 h-4 w-4" />
+            <Button variant="secondary" size="sm" onClick={() => handleUnblock(slot.details!.id)} className="flex-shrink-0 px-2 py-1 h-auto"> {/* Padding e altura menores */}
+              <Unlock className="h-3 w-3 mr-1" /> {/* Ícone menor */}
               Desbloquear
             </Button>
           </div>
@@ -273,7 +273,7 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
                   <Clock className="h-5 w-5 text-primary" />
                   <p className="text-lg font-bold">{format(slot.time, 'HH:mm')}</p>
                 </div>
-                {renderSlotContent(slot)} {/* Agora renderiza o conteúdo do slot aqui */}
+                {renderSlotContent(slot)}
               </div>
             ))}
           </div>
