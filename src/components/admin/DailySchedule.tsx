@@ -242,13 +242,13 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
         );
       case 'blocked':
         return (
-          <div className="flex-1 flex items-center justify-end gap-2"> {/* Este div ocupa o espaço restante e alinha o conteúdo à direita */}
-            <div className="flex items-center gap-1 text-destructive"> {/* Agrupa ícone e texto */}
+          <div className="flex-1 flex items-center justify-end gap-2">
+            <div className="flex items-center gap-1 text-destructive text-sm"> {/* Adicionado text-sm */}
               <Lock className="h-4 w-4" />
-              <span>Bloqueado</span> {/* Texto mais curto */}
+              <span>Bloqueado</span>
             </div>
-            <Button variant="secondary" size="sm" onClick={() => handleUnblock(slot.details!.id)} className="flex-shrink-0 px-2 py-1 h-auto"> {/* Padding e altura menores */}
-              <Unlock className="h-3 w-3 mr-1" /> {/* Ícone menor */}
+            <Button variant="secondary" size="sm" onClick={() => handleUnblock(slot.details!.id)} className="flex-shrink-0 px-2 py-1 h-auto text-sm"> {/* Adicionado text-sm */}
+              <Unlock className="h-3 w-3 mr-1" />
               Desbloquear
             </Button>
           </div>
