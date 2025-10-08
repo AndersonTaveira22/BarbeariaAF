@@ -42,7 +42,8 @@ const DateTimePicker = ({ barber, onDateTimeSelect }: DateTimePickerProps) => {
         return;
       }
 
-      const { data: appointments } = await supabase.from('appointments').select('appointment_time').eq('barber_id', barber.id).gte('appointment_time', startOfDayUTC).lte('appointment_time', endOfDayUTC);
+      // Adicionado filtro para status 'agendado'
+      const { data: appointments } = await supabase.from('appointments').select('appointment_time').eq('barber_id', barber.id).eq('status', 'agendado').gte('appointment_time', startOfDayUTC).lte('appointment_time', endOfDayUTC);
       const { data: blockedSlots } = await supabase.from('blocked_slots').select('start_time').eq('barber_id', barber.id).gte('start_time', startOfDayUTC).lte('start_time', endOfDayUTC);
 
       // Helper to convert UTC DB timestamp to local Date object for comparison

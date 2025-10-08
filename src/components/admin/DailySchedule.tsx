@@ -68,7 +68,8 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     }
 
     const [appointmentsRes, blockedSlotsRes] = await Promise.all([
-      supabase.from('appointments').select('id, appointment_time, client_id, service_id, client_name, client_phone').eq('barber_id', currentUser.id).gte('appointment_time', start).lte('appointment_time', end),
+      // Adicionado filtro para status 'agendado'
+      supabase.from('appointments').select('id, appointment_time, client_id, service_id, client_name, client_phone').eq('barber_id', currentUser.id).eq('status', 'agendado').gte('appointment_time', start).lte('appointment_time', end),
       supabase.from('blocked_slots').select('id, start_time').eq('barber_id', currentUser.id).gte('start_time', start).lte('start_time', end)
     ]);
 
