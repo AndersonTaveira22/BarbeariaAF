@@ -21,7 +21,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => { // Linha corrigida aqui
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   console.log("AuthContext: AuthProvider renderizado.");
   const [currentUser, setCurrentUser] = useState<User | null | undefined>(undefined); // undefined para indicar carregamento
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -201,7 +201,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // Linh
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       console.error("AuthContext: Erro no login:", error);
-      showError(error.message);
+      let errorMessage = error.message;
+      // Verifica se a mensagem de erro é sobre e-mail não confirmado e traduz
+      if (errorMessage.includes("Email not confirmed")) {
+        errorMessage = "Seu e-mail ainda não foi confirmado. Por favor, verifique sua caixa de entrada.";
+      }
+      showError(errorMessage);
     } else if (data.user) {
       console.log("AuthContext: Login bem-sucedido para:", data.user.id);
       // onAuthStateChange irá lidar com a definição de currentUser e profile
