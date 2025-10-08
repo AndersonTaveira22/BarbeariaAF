@@ -21,7 +21,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export const AuthProvider = ({ children }: { children: ReactNode }) => { // Linha corrigida aqui
   console.log("AuthContext: AuthProvider renderizado.");
   const [currentUser, setCurrentUser] = useState<User | null | undefined>(undefined); // undefined para indicar carregamento
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -119,9 +119,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const handleAuthSession = async (session: Session | null) => {
       if (session?.user) {
-        setCurrentUser(session.user);
-        console.log("AuthContext: Current user set. Email confirmed at:", session.user.email_confirmed_at); // LOG DE DEPURACAO
-        const userProfile = await fetchOrCreateProfile(session.user);
+        // Explicitamente busca os dados mais recentes do usuário para garantir que email_confirmed_at esteja atualizado
+        const { data: { user: latestUser }, error: userError } = await supabase.auth.getUser();
+        if (userError) {
+          console.error("AuthContext: Erro ao buscar o usuário mais recente:", userError);
+          showError("Erro ao atualizar dados do usuário. Por favor, tente novamente.");
+          setCurrentUser(null);
+          setProfile(null);
+          await supabase.auth.signOut();
+          return;
+        }
+
+        setCurrentUser(latestUser); // Usa os dados mais recentes do usuário
+        console.log("AuthContext: Current user set. Email confirmed at:", latestUser?.email_confirmed_at); // LOG DE DEPURACAO
+        const userProfile = await fetchOrCreateProfile(latestUser); // Passa latestUser
         if (userProfile) {
           setProfile(userProfile);
         } else {
@@ -165,9 +176,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log("AuthContext: onAuthStateChange ignorando INITIAL_SESSION, já tratado por getSession().");
         return;
       }
-      // Para outros eventos (SIGNED_IN, SIGNED_OUT, USER_UPDATED), processa a sessão.
-      // Não gerenciamos o estado `loading` aqui, pois é para o carregamento inicial do aplicativo.
-      await handleAuthSession(session);
+      // Para outros eventos (SIGNED_IN, USER_UPDATED), processa a sessão.
+      // Explicitamente busca os dados mais recentes do usuário aqui também para garantir que email_confirmed_at esteja atualizado
+      const { data: { user: latestUser }, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error("AuthContext: Erro ao buscar o usuário mais recente no onAuthStateChange:", userError);
+        showError("Erro ao atualizar dados do usuário. Por favor, tente novamente.");
+        setCurrentUser(null);
+        setProfile(null);
+        await supabase.auth.signOut();
+        return;
+      }
+      await handleAuthSession({ ...session, user: latestUser }); // Passa a sessão com os dados mais recentes do usuário
     });
 
     return () => {
