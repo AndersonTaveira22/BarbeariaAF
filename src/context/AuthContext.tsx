@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'; // Adicionado useRef
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { showError, showSuccess } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -114,53 +114,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, 10000); // 10 segundos de tempo limite para o carregamento inicial
 
     const handleAuthSession = async (session: Session | null) => {
-      try {
-        if (session?.user) {
-          setCurrentUser(session.user);
-          const userProfile = await fetchOrCreateProfile(session.user);
-          if (userProfile) {
-            setProfile(userProfile);
-          } else {
-            console.error("AuthContext: Falha ao carregar/criar perfil. Forçando logout.");
-            showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
-            await supabase.auth.signOut();
-            setCurrentUser(null);
-            setProfile(null);
-          }
+      // Esta função agora apenas lida com a definição de usuário/perfil com base em uma sessão
+      // O try/catch/finally para o estado de carregamento será fora desta função.
+      if (session?.user) {
+        setCurrentUser(session.user);
+        const userProfile = await fetchOrCreateProfile(session.user);
+        if (userProfile) {
+          setProfile(userProfile);
         } else {
+          console.error("AuthContext: Falha ao carregar/criar perfil. Forçando logout.");
+          showError('Não foi possível carregar os dados do perfil. Por favor, faça login novamente.');
+          await supabase.auth.signOut();
           setCurrentUser(null);
           setProfile(null);
         }
-      } catch (e) {
-        console.error("AuthContext: Erro inesperado em handleAuthSession:", e);
-        showError("Erro inesperado na autenticação. Por favor, tente novamente.");
+      } else {
         setCurrentUser(null);
         setProfile(null);
-        await supabase.auth.signOut();
-      } finally {
-        setLoading(false); // Define loading como false após processar a sessão
-        initialLoadCompleteRef.current = true; // Atualiza o valor do ref
-        console.log("AuthContext: handleAuthSession finalizado. Loading set to false, initialLoadCompleteRef.current set to true.");
       }
     };
 
-    // Lida com a sessão inicial
-    const loadInitialSession = async () => {
-      const { data: { session: initialSession } } = await supabase.auth.getSession();
-      await handleAuthSession(initialSession);
+    // Função assíncrona principal para o carregamento inicial
+    const initializeAuth = async () => {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        await handleAuthSession(initialSession);
+      } catch (e) {
+        console.error("AuthContext: Erro inesperado durante a inicialização da autenticação:", e);
+        showError("Erro inesperado na inicialização da autenticação. Por favor, tente novamente.");
+        setCurrentUser(null);
+        setProfile(null);
+        await supabase.auth.signOut(); // Garante a limpeza mesmo em erro inicial
+      } finally {
+        setLoading(false);
+        initialLoadCompleteRef.current = true;
+        console.log("AuthContext: initializeAuth finalizado. Loading set to false, initialLoadCompleteRef.current set to true.");
+      }
     };
-    loadInitialSession();
 
+    initializeAuth(); // Chama a função de inicialização principal
 
-    // Assina as mudanças de estado de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log("AuthContext: onAuthStateChange event:", _event, "session:", session?.user?.id);
-      // Se o evento for INITIAL_SESSION, já lidamos com ele acima, então podemos ignorar aqui
+      // Se o evento for INITIAL_SESSION, já lidamos com ele acima com getSession(), então podemos ignorá-lo aqui.
+      // Isso evita o processamento duplo da sessão inicial.
       if (_event === 'INITIAL_SESSION') {
         console.log("AuthContext: onAuthStateChange ignorando INITIAL_SESSION, já tratado por getSession().");
         return;
       }
-      // Para outros eventos (SIGNED_IN, SIGNED_OUT, USER_UPDATED), processa a sessão
+      // Para outros eventos (SIGNED_IN, SIGNED_OUT, USER_UPDATED), processa a sessão.
+      // Não gerenciamos o estado `loading` aqui, pois é para o carregamento inicial do aplicativo.
       await handleAuthSession(session);
     });
 
