@@ -204,7 +204,7 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
 
   const formattedDate = selectedDate ? format(selectedDate, "eeee, dd 'de' MMMM", { locale: ptBR }) : 'Nenhuma data selecionada';
 
-  const renderSlot = (slot: Slot) => {
+  const renderSlotContent = (slot: Slot) => {
     switch (slot.status) {
       case 'booked':
         return (
@@ -242,9 +242,15 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
         );
       case 'blocked':
         return (
-          <div className="flex-1 flex items-center gap-2 text-destructive">
-            <Lock className="h-4 w-4" />
-            <span>Horário Bloqueado</span>
+          <div className="flex items-center justify-end flex-1 gap-2"> {/* Novo contêiner para status bloqueado */}
+            <div className="flex items-center gap-2 text-destructive">
+              <Lock className="h-4 w-4" />
+              <span>Horário Bloqueado</span>
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => handleUnblock(slot.details!.id)} className="flex-shrink-0">
+              <Unlock className="mr-1 h-4 w-4" />
+              Desbloquear
+            </Button>
           </div>
         );
       default:
@@ -262,18 +268,12 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
         {loading ? <Skeleton className="h-40 w-full" /> : slots.length > 0 ? (
           <div className="space-y-2">
             {slots.map((slot) => (
-              <div key={slot.time.toISOString()} className="p-3 border rounded-lg bg-card flex items-center justify-between gap-4"> {/* Adicionado justify-between */}
+              <div key={slot.time.toISOString()} className="p-3 border rounded-lg bg-card flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 w-24">
                   <Clock className="h-5 w-5 text-primary" />
                   <p className="text-lg font-bold">{format(slot.time, 'HH:mm')}</p>
                 </div>
-                {renderSlot(slot)}
-                {slot.status === 'blocked' && (
-                  <Button variant="secondary" size="sm" onClick={() => handleUnblock(slot.details!.id)} className="flex-shrink-0"> {/* Adicionado flex-shrink-0 e ajustado mr */}
-                    <Unlock className="mr-1 h-4 w-4" />
-                    Desbloquear
-                  </Button>
-                )}
+                {renderSlotContent(slot)} {/* Agora renderiza o conteúdo do slot aqui */}
               </div>
             ))}
           </div>
