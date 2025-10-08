@@ -61,7 +61,7 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       .single();
 
     if (availabilityError || !availability) {
-      showError(`Disponibilidade diária não definida para ${dateStr} (Barbeiro ID: ${currentUser.id}). Por favor, defina em "Gerenciar Disponibilidade".`);
+      // Removida a chamada showError aqui
       setSlots([]);
       setLoading(false);
       return;
