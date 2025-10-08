@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { add, format, startOfDay, endOfDay, set } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Clock, User, Scissors, Lock, Unlock, Trash2, Phone } from 'lucide-react'; // Importado Phone
+import { Clock, User, Scissors, Lock, Unlock, Trash2, Phone } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import {
   AlertDialog,
@@ -26,7 +26,7 @@ interface Slot {
   details?: {
     id: string;
     client_name?: string;
-    client_phone?: string; // Adicionado client_phone
+    client_phone?: string;
     service_name?: string;
   };
 }
@@ -68,7 +68,6 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
     }
 
     const [appointmentsRes, blockedSlotsRes] = await Promise.all([
-      // Incluindo client_phone na seleção
       supabase.from('appointments').select('id, appointment_time, client_id, service_id, client_name, client_phone').eq('barber_id', currentUser.id).gte('appointment_time', start).lte('appointment_time', end),
       supabase.from('blocked_slots').select('id, start_time').eq('barber_id', currentUser.id).gte('start_time', start).lte('start_time', end)
     ]);
@@ -114,7 +113,7 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
       details: {
         id: a.id,
         client_name: clientNamesMap.get(a.client_id) || a.client_name || 'Nome Indisponível',
-        client_phone: a.client_phone || 'Telefone Indisponível', // Atribuindo client_phone
+        client_phone: a.client_phone || 'Telefone Indisponível',
         service_name: serviceNamesMap.get(a.service_id) || 'Serviço Indisponível'
       }
     })) || [];
@@ -194,14 +193,13 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
   };
 
   const formatPhoneNumberForWhatsApp = (phone: string) => {
-    // Remove todos os caracteres não numéricos e adiciona o código do país (55 para Brasil)
     const digitsOnly = phone.replace(/\D/g, '');
-    if (digitsOnly.length === 11) { // Ex: 99 99999-9999
+    if (digitsOnly.length === 11) {
       return `55${digitsOnly}`;
-    } else if (digitsOnly.length === 10) { // Ex: 99 9999-9999
+    } else if (digitsOnly.length === 10) {
       return `55${digitsOnly}`;
     }
-    return digitsOnly; // Retorna como está se não for um formato comum
+    return digitsOnly;
   };
 
   const formattedDate = selectedDate ? format(selectedDate, "eeee, dd 'de' MMMM", { locale: ptBR }) : 'Nenhuma data selecionada';
@@ -243,7 +241,12 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
           </div>
         );
       case 'blocked':
-        return <div className="flex-1 flex items-center gap-2 text-destructive"><Lock className="h-4 w-4" /><span>Horário Bloqueado</span></div>;
+        return (
+          <div className="flex-1 flex items-center gap-2 text-destructive">
+            <Lock className="h-4 w-4" />
+            <span>Horário Bloqueado</span>
+          </div>
+        );
       default:
         return null;
     }
@@ -259,13 +262,18 @@ const DailySchedule = ({ selectedDate }: DailyScheduleProps) => {
         {loading ? <Skeleton className="h-40 w-full" /> : slots.length > 0 ? (
           <div className="space-y-2">
             {slots.map((slot) => (
-              <div key={slot.time.toISOString()} className="p-3 border rounded-lg bg-card flex items-center gap-4">
+              <div key={slot.time.toISOString()} className="p-3 border rounded-lg bg-card flex items-center justify-between gap-4"> {/* Adicionado justify-between */}
                 <div className="flex items-center gap-2 w-24">
                   <Clock className="h-5 w-5 text-primary" />
                   <p className="text-lg font-bold">{format(slot.time, 'HH:mm')}</p>
                 </div>
                 {renderSlot(slot)}
-                {slot.status === 'blocked' && <Button variant="secondary" size="sm" onClick={() => handleUnblock(slot.details!.id)}><Unlock className="mr-2 h-4 w-4" />Desbloquear</Button>}
+                {slot.status === 'blocked' && (
+                  <Button variant="secondary" size="sm" onClick={() => handleUnblock(slot.details!.id)} className="flex-shrink-0"> {/* Adicionado flex-shrink-0 e ajustado mr */}
+                    <Unlock className="mr-1 h-4 w-4" />
+                    Desbloquear
+                  </Button>
+                )}
               </div>
             ))}
           </div>
