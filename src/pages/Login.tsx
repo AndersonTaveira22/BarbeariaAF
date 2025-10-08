@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+// import { Checkbox } from '@/components/ui/checkbox'; // Removido o import do Checkbox
 import { useAuth } from '@/context/AuthContext';
 
 const Login = () => {
@@ -57,15 +57,7 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox id="remember-me" defaultChecked />
-              <Label
-                htmlFor="remember-me"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Manter conectado
-              </Label>
-            </div>
+            {/* Removida a checkbox "Manter conectado" */}
             <Button type="submit" className="w-full">
               Login
             </Button>
