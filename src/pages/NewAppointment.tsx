@@ -9,10 +9,11 @@ import BackButton from '@/components/BackButton';
 import { showError, showSuccess } from '@/utils/toast';
 import DateTimePicker from '@/components/DateTimePicker';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
+import { format, isBefore, addHours, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CalendarCheck, User as UserIcon, Phone as PhoneIcon, Scissors as ScissorsIcon } from 'lucide-react';
 
 interface Service {
   id: string;
@@ -24,6 +25,19 @@ interface Barber {
   id: string;
   full_name: string;
   avatar_url: string;
+}
+
+interface Appointment {
+  id: string;
+  appointment_time: string; // ISO string
+  status: string;
+  client_name: string;
+  client_phone: string;
+  barber_id: string;
+  service_id: string;
+  // Dados relacionados (vindos do join)
+  barber?: Barber;
+  service?: Service;
 }
 
 const NewAppointment = () => {
@@ -40,7 +54,55 @@ const NewAppointment = () => {
   const [loadingServices, setLoadingServices] = useState(true);
   const [loadingBarbers, setLoadingBarbers] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
+  const [existingAppointment, setExistingAppointment] = useState<Appointment | null>(null);
+  const [loadingExistingAppointment, setLoadingExistingAppointment] = useState(true);
 
+  // Efeito para buscar agendamento existente do usuário
+  useEffect(() => {
+    const fetchExistingAppointment = async () => {
+      if (!currentUser) {
+        setLoadingExistingAppointment(false);
+        return;
+      }
+
+      setLoadingExistingAppointment(true);
+      const now = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          id,
+          appointment_time,
+          status,
+          client_name,
+          client_phone,
+          barber_id,
+          service_id,
+          barber:profiles(id, full_name, avatar_url),
+          service:services(id, name, price)
+        `)
+        .eq('client_id', currentUser.id)
+        .eq('status', 'agendado')
+        .gte('appointment_time', now) // Apenas agendamentos futuros
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 significa que nenhuma linha foi encontrada, o que é normal
+        showError('Erro ao buscar agendamento existente: ' + error.message);
+        setExistingAppointment(null);
+      } else if (data) {
+        // Asserção de tipo para o objeto completo, que já inclui barber e service
+        // Usar 'unknown' como intermediário para forçar a conversão
+        setExistingAppointment(data as unknown as Appointment);
+      } else {
+        setExistingAppointment(null);
+      }
+      setLoadingExistingAppointment(false);
+    };
+
+    fetchExistingAppointment();
+  }, [currentUser]);
+
+  // Efeito existente para serviços e barbeiros, agora condicional
   useEffect(() => {
     if (!currentUser) {
       navigate('/login');
@@ -51,7 +113,7 @@ const NewAppointment = () => {
     if (profile?.full_name) {
       setClientName(profile.full_name);
     }
-    if (profile?.phone_number) { // Preenche o telefone automaticamente
+    if (profile?.phone_number) {
       setClientPhone(profile.phone_number);
     }
 
@@ -66,8 +128,11 @@ const NewAppointment = () => {
       setLoadingServices(false);
     };
 
-    fetchServices();
-  }, [currentUser, navigate, profile]);
+    // Só busca serviços se não houver agendamento existente e não estiver carregando
+    if (!existingAppointment && !loadingExistingAppointment) {
+      fetchServices();
+    }
+  }, [currentUser, navigate, profile, existingAppointment, loadingExistingAppointment]);
 
   useEffect(() => {
     const fetchBarbers = async () => {
@@ -85,10 +150,11 @@ const NewAppointment = () => {
       setLoadingBarbers(false);
     };
 
-    if (step === 2) {
+    // Só busca barbeiros se estiver no passo 2 e não houver agendamento existente
+    if (step === 2 && !existingAppointment && !loadingExistingAppointment) {
       fetchBarbers();
     }
-  }, [step]);
+  }, [step, existingAppointment, loadingExistingAppointment]);
 
   const handleSelectService = (service: Service) => {
     setSelectedService(service);
@@ -102,7 +168,7 @@ const NewAppointment = () => {
 
   const handleDateTimeSelect = (dateTime: Date) => {
     setAppointmentTime(dateTime);
-    setStep(4); // Move to step 4 to collect client info
+    setStep(4); // Move para o passo 4 para coletar informações do cliente
   };
 
   const handleClientInfoSubmit = () => {
@@ -110,7 +176,7 @@ const NewAppointment = () => {
       showError("Por favor, preencha seu nome e telefone.");
       return;
     }
-    setStep(5); // Move to confirmation step
+    setStep(5); // Move para o passo de confirmação
   };
 
   const handleConfirmBooking = async () => {
@@ -125,18 +191,92 @@ const NewAppointment = () => {
       service_id: selectedService.id,
       appointment_time: appointmentTime.toISOString(),
       status: 'agendado',
-      client_name: clientName, // Save client name
-      client_phone: clientPhone, // Save client phone
+      client_name: clientName, // Salva o nome do cliente
+      client_phone: clientPhone, // Salva o telefone do cliente
     });
 
     if (error) {
       showError(`Erro ao agendar: ${error.message}`);
     } else {
       showSuccess('Agendamento realizado com sucesso!');
-      navigate('/');
+      navigate('/'); // Redireciona para a página inicial após o agendamento
     }
     setIsBooking(false);
   };
+
+  const handleCancelAppointment = async () => {
+    if (!existingAppointment) return;
+
+    const appointmentDateTime = parseISO(existingAppointment.appointment_time);
+    const now = new Date();
+    const twelveHoursBeforeAppointment = addHours(appointmentDateTime, -12); // 12 horas antes do agendamento
+
+    if (isBefore(now, twelveHoursBeforeAppointment)) {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelado' })
+        .eq('id', existingAppointment.id);
+
+      if (error) {
+        showError('Erro ao cancelar agendamento: ' + error.message);
+      } else {
+        showSuccess('Agendamento cancelado com sucesso!');
+        setExistingAppointment(null); // Limpa o agendamento existente
+        setStep(1); // Reseta para o passo 1 para permitir um novo agendamento
+      }
+    } else {
+      showError('Não é possível cancelar o agendamento com menos de 12 horas de antecedência.');
+    }
+  };
+
+  // Verifica se o agendamento pode ser cancelado (mais de 12 horas de antecedência)
+  const canCancel = existingAppointment && isBefore(new Date(), addHours(parseISO(existingAppointment.appointment_time), -12));
+
+  // Componente para exibir o agendamento existente
+  const renderExistingAppointment = () => (
+    <Card className="border-border">
+      <CardHeader>
+        <CardTitle className="text-4xl font-serif">Seu Agendamento Atual</CardTitle>
+        <CardDescription>Você já tem um agendamento ativo.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-4">
+          <CalendarCheck className="h-6 w-6 text-primary" />
+          <p className="text-lg">
+            <strong>Data e Hora:</strong> {format(parseISO(existingAppointment!.appointment_time), "eeee, dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <ScissorsIcon className="h-6 w-6 text-primary" />
+          <p className="text-lg">
+            <strong>Serviço:</strong> {existingAppointment!.service?.name} (R$ {existingAppointment!.service?.price.toFixed(2).replace('.', ',')})
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <UserIcon className="h-6 w-6 text-primary" />
+          <p className="text-lg">
+            <strong>Barbeiro:</strong> {existingAppointment!.barber?.full_name}
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <PhoneIcon className="h-6 w-6 text-primary" />
+          <p className="text-lg">
+            <strong>Seu Telefone:</strong> {existingAppointment!.client_phone}
+          </p>
+        </div>
+      </CardContent>
+      <CardFooter>
+        <Button
+          onClick={handleCancelAppointment}
+          disabled={!canCancel}
+          variant="destructive"
+          className="w-full"
+        >
+          {canCancel ? 'Cancelar Agendamento' : 'Não é possível cancelar (menos de 12h)'}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
 
   const renderStepContent = () => {
     switch (step) {
@@ -256,26 +396,53 @@ const NewAppointment = () => {
     }
   };
 
+  // Exibe um skeleton enquanto busca o agendamento existente
+  if (loadingExistingAppointment) {
+    return (
+      <div className="min-h-screen bg-background p-4 sm:p-8">
+        <div className="max-w-4xl mx-auto">
+          <BackButton />
+          <Card className="border-border">
+            <CardHeader>
+              <Skeleton className="h-10 w-3/4 mb-2" />
+              <Skeleton className="h-6 w-1/2" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-4 sm:p-8">
       <div className="max-w-4xl mx-auto">
         <BackButton />
-        <Card className="border-border">
-          <CardHeader>
-            <CardTitle className="text-4xl font-serif">Novo Agendamento</CardTitle>
-            <CardDescription>Siga os passos para agendar seu horário.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {renderStepContent()}
-          </CardContent>
-          {step === 5 && (
-            <CardFooter>
-              <Button onClick={handleConfirmBooking} disabled={isBooking} className="w-full">
-                {isBooking ? 'Agendando...' : 'Confirmar Agendamento'}
-              </Button>
-            </CardFooter>
-          )}
-        </Card>
+        {existingAppointment ? (
+          renderExistingAppointment() // Se houver agendamento, exibe-o
+        ) : (
+          // Caso contrário, exibe o formulário de novo agendamento
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="text-4xl font-serif">Novo Agendamento</CardTitle>
+              <CardDescription>Siga os passos para agendar seu horário.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {renderStepContent()}
+            </CardContent>
+            {step === 5 && (
+              <CardFooter>
+                <Button onClick={handleConfirmBooking} disabled={isBooking} className="w-full">
+                  {isBooking ? 'Agendando...' : 'Confirmar Agendamento'}
+                </Button>
+              </CardFooter>
+            )}
+          </Card>
+        )}
       </div>
     </div>
   );
