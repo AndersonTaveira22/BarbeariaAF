@@ -8,6 +8,11 @@ const Index = () => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background">
       <div className="text-center p-8">
+        <img
+          src="https://fhneddlnsiccucvmuftm.supabase.co/storage/v1/object/public/foto%20logo/Logo-Barbearia.png"
+          alt="Barbearia AF Logo"
+          className="mx-auto mb-8 w-48 h-48 object-contain"
+        />
         <h1 className="text-6xl font-serif font-bold mb-4 text-foreground">Bem-vindo à Barbearia AF</h1>
         {currentUser && profile ? (
           <div>
