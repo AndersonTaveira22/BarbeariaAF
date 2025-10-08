@@ -19,9 +19,7 @@ const Index = () => {
             <p className="text-xl text-muted-foreground mb-2">
               Olá, {profile.full_name}! O que vamos fazer hoje?
             </p>
-            <p className={`text-lg mb-8 ${isEmailVerified ? 'text-green-500' : 'text-red-500'}`}>
-              Email {isEmailVerified ? 'verificado' : 'não verificado'}
-            </p>
+            {/* Removido o status de verificação do e-mail */}
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
                <Button asChild size="lg">
                 <Link to="/new-appointment">Novo Agendamento</Link>
