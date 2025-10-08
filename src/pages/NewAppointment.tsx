@@ -79,7 +79,7 @@ const NewAppointment = () => {
           barber_id,
           service_id,
           barber:profiles!fk_barber_id(id, full_name, avatar_url),
-          service:services(id, name, price)
+          service:services!fk_service_id(id, name, price)
         `)
         .eq('client_id', currentUser.id)
         .eq('status', 'agendado')
