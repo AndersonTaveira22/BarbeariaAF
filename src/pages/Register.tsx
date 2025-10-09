@@ -12,12 +12,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
+import { Eye, EyeOff } from 'lucide-react'; // Importando os ícones
 
 const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState(''); // Novo estado para o telefone
+  const [phone, setPhone] = useState('');
+  const [showPassword, setShowPassword] = useState(false); // Novo estado para controlar a visibilidade da senha
   const navigate = useNavigate();
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -29,7 +31,7 @@ const Register = () => {
       options: {
         data: {
           full_name: name,
-          phone_number: phone, // Enviando o número de telefone
+          phone_number: phone,
         },
       },
     });
@@ -68,12 +70,34 @@ const Register = () => {
                 <Input id="email" type="email" placeholder="seu@email.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="phone">Telefone</Label> {/* Novo campo de telefone */}
+                <Label htmlFor="phone">Telefone</Label>
                 <Input id="phone" type="tel" placeholder="(XX) XXXXX-XXXX" required value={phone} onChange={(e) => setPhone(e.target.value)} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="password">Senha</Label>
-                <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                <div className="relative"> {/* Adicionado um container relativo para posicionar o botão */}
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'} // Alterna o tipo do input
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pr-10" // Adiciona padding à direita para o botão
+                  />
+                  <Button
+                    type="button" // Importante para não submeter o formulário
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-1"
+                    onClick={() => setShowPassword((prev) => !prev)} // Alterna o estado
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
               <Button type="submit" className="w-full">
                 Criar Conta

@@ -11,10 +11,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
+import { Eye, EyeOff } from 'lucide-react'; // Importando os ícones
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false); // Novo estado para controlar a visibilidade da senha
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,13 +55,29 @@ const Login = () => {
               <div className="flex items-center">
                 <Label htmlFor="password">Senha</Label>
               </div>
-              <Input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div className="relative"> {/* Adicionado um container relativo para posicionar o botão */}
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'} // Alterna o tipo do input
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pr-10" // Adiciona padding à direita para o botão
+                />
+                <Button
+                  type="button" // Importante para não submeter o formulário
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-1"
+                  onClick={() => setShowPassword((prev) => !prev)} // Alterna o estado
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
             <Button type="submit" className="w-full">
               Login
